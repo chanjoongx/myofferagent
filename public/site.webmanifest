@@ -1,0 +1,16 @@
+{
+  "name": "My Offer Agent",
+  "short_name": "OfferAgent",
+  "description": "AI-Powered Career Assistant — Resume building, ATS analysis, job search, and application writing",
+  "start_url": "/agent",
+  "display": "standalone",
+  "background_color": "#0a0a0f",
+  "theme_color": "#14b8a6",
+  "icons": [
+    {
+      "src": "/brand/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}

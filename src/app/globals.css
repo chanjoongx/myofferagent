@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+@theme {
+  --color-accent: oklch(0.765 0.177 163.22);
+  --color-accent-hover: oklch(0.700 0.177 163.22);
+  --color-surface: oklch(0.100 0.005 285.82);
+  --color-surface-elevated: oklch(0.155 0.008 285.82);
+  --color-surface-border: oklch(0.220 0.010 285.82);
+  --color-text-primary: oklch(0.950 0.005 285.82);
+  --color-text-secondary: oklch(0.580 0.010 285.82);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ── Dark mode (default) ── */
+html.dark {
+  color-scheme: dark;
+}
+
+/* ── Light mode overrides ── */
+html.light {
+  color-scheme: light;
+  --color-surface: oklch(0.985 0.002 285.82);
+  --color-surface-elevated: oklch(1.000 0 0);
+  --color-surface-border: oklch(0.880 0.005 285.82);
+  --color-text-primary: oklch(0.150 0.010 285.82);
+  --color-text-secondary: oklch(0.450 0.010 285.82);
+  --color-accent: oklch(0.580 0.200 163.22);
+  --color-accent-hover: oklch(0.530 0.200 163.22);
+}
+
+body {
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+/* ── Glass morphism ── */
+html.dark .glass {
+  background: oklch(0.120 0.006 285.82 / 0.65);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+html.light .glass {
+  background: oklch(0.970 0.002 285.82 / 0.80);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right-color: oklch(0.880 0.005 285.82);
+}
+
+/* ── Hero gradient mesh ── */
+.hero-glow {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.hero-glow::before {
+  content: "";
+  position: absolute;
+  top: -30%;
+  left: 50%;
+  translate: -50% 0;
+  width: 140%;
+  height: 80%;
+}
+html.dark .hero-glow::before {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    oklch(0.765 0.177 163.22 / 0.10),
+    transparent 70%
+  );
+}
+html.light .hero-glow::before {
+  background: radial-gradient(
+    ellipse 60% 50% at 50% 0%,
+    oklch(0.580 0.200 163.22 / 0.06),
+    transparent 70%
+  );
+}
+.hero-glow::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+}
+html.dark .hero-glow::after {
+  background: radial-gradient(
+    ellipse 80% 60% at 30% 100%,
+    oklch(0.55 0.14 260 / 0.05),
+    transparent 70%
+  );
+}
+html.light .hero-glow::after {
+  background: radial-gradient(
+    ellipse 80% 60% at 30% 100%,
+    oklch(0.55 0.14 260 / 0.03),
+    transparent 70%
+  );
+}
+
+/* ── Entrance animations ── */
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slide-in-from-bottom-2 {
+  from { transform: translateY(8px); }
+  to { transform: translateY(0); }
+}
+.animate-in {
+  animation: fade-in 0.2s ease-out, slide-in-from-bottom-2 0.2s ease-out;
+}
+
+/* ── Drawer slide ── */
+@keyframes slide-down {
+  from { max-height: 0; opacity: 0; }
+  to { max-height: 400px; opacity: 1; }
+}
+.drawer-enter {
+  animation: slide-down 0.25s ease-out forwards;
+  overflow: hidden;
+}
+
+/* ── Scrollbar ── */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.300 0.010 285.82 / 0.5);
+  border-radius: 9999px;
+}
+html.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.400 0.010 285.82 / 0.6);
+}
+html.light .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: oklch(0.700 0.005 285.82 / 0.3);
+  border-radius: 9999px;
+}
+html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: oklch(0.600 0.005 285.82 / 0.4);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .animate-in,
+  .drawer-enter {
+    animation: none !important;
+  }
+  .animate-bounce,
+  .animate-pulse,
+  .animate-spin {
+    animation: none !important;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── Subtle grid ── */
+html.dark .grid-bg {
+  background-image: linear-gradient(
+      oklch(0.220 0.010 285.82 / 0.40) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      oklch(0.220 0.010 285.82 / 0.40) 1px,
+      transparent 1px
+    );
+  background-size: 64px 64px;
+}
+html.light .grid-bg {
+  background-image: linear-gradient(
+      oklch(0.880 0.005 285.82 / 0.50) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      90deg,
+      oklch(0.880 0.005 285.82 / 0.50) 1px,
+      transparent 1px
+    );
+  background-size: 64px 64px;
+}

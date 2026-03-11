@@ -2,6 +2,7 @@
 
 import { memo, useState, useCallback } from "react";
 import ReactMarkdown, { type Components } from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Bot, ArrowRightLeft, Copy, Check } from "lucide-react";
 import { isSafeUrl } from "@/lib/url-utils";
 
@@ -199,7 +200,7 @@ function MessageBubble({
             {isUser ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
             ) : (
-              <ReactMarkdown components={mdComponents}>{content}</ReactMarkdown>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>
             )}
           </div>
         </div>

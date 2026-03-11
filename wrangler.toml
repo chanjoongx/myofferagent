@@ -1,12 +1,12 @@
 #:schema node_modules/wrangler/config-schema.json
 
 name = "myofferagent"
+main = ".open-next/worker.js"
 compatibility_date = "2026-03-11"
 compatibility_flags = ["nodejs_compat"]
 
-# Pages 빌드 설정
-pages_build_output_dir = ".open-next"
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
-# 환경 변수 — 시크릿은 `npx wrangler pages secret put OPENAI_API_KEY`로 설정
-# [vars]
-# OPENAI_API_KEY = "" # ← wrangler secret으로 관리
+# Environment variables — set secrets via `npx wrangler secret put OPENAI_API_KEY`

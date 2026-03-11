@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import Link from "next/link";
 import {
   Crosshair,
@@ -51,7 +51,7 @@ interface AgentStatusPanelProps {
   isLoading?: boolean;
 }
 
-export default function AgentStatusPanel({
+export default memo(function AgentStatusPanel({
   currentAgent,
   completedAgents,
   onAgentSelect,
@@ -326,4 +326,4 @@ export default function AgentStatusPanel({
       </div>
     </div>
   );
-}
+});

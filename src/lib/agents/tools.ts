@@ -156,8 +156,9 @@ JSON Schema:
 
 반드시 유효한 JSON만 출력하세요.`;
 
-    const userMsg = input.targetRole.length > 0
-      ? `[목표 직무: ${input.targetRole}]\n\n${input.text}`
+    const sanitizedRole = input.targetRole.replace(/[\n\r]/g, ' ').slice(0, 200);
+    const userMsg = sanitizedRole.length > 0
+      ? `[목표 직무: ${sanitizedRole}]\n\n${input.text}`
       : input.text;
 
     try {
@@ -193,7 +194,7 @@ export const calculateATSScore = tool({
     targetRole: z.string().max(200).default('').describe('지원 목표 직무'),
   }),
   execute: async (input): Promise<string> => {
-    const role = input.targetRole || 'Software Engineer';
+    const role = (input.targetRole || 'Software Engineer').replace(/[\n\r]/g, ' ').slice(0, 200);
 
     const systemPrompt = `당신은 ATS(Applicant Tracking System) 분석 전문가입니다.
 주어진 이력서 JSON을 분석하여 아래 형식의 ATS 점수를 생성하세요.

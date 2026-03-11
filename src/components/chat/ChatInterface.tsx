@@ -174,8 +174,18 @@ function extractResumeContent(content: string): string | null {
 
 /* ── 마크다운 → HTML 변환 (이력서 인쇄용, 경량) ── */
 
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 function markdownToHtml(md: string): string {
-  return md
+  // Strip any raw HTML tags before markdown processing
+  const sanitized = md.replace(/<[^>]*>/g, '');
+  return sanitized
     .replace(/^### (.+)$/gm, '<h3>$1</h3>')
     .replace(/^## (.+)$/gm, '<h2>$1</h2>')
     .replace(/^# (.+)$/gm, '<h1>$1</h1>')
@@ -184,7 +194,15 @@ function markdownToHtml(md: string): string {
     .replace(/^- (.+)$/gm, '<li>$1</li>')
     .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
     .replace(/^---$/gm, '<hr/>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
+      try {
+        const u = new URL(url);
+        if (u.protocol === 'http:' || u.protocol === 'https:') {
+          return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;
+        }
+      } catch { /* invalid URL */ }
+      return escapeHtml(text);
+    })
     .replace(/^(?!<[hulo]|<li|<hr)(.*\S.*)$/gm, '<p>$1</p>')
     .replace(/\n{2,}/g, '\n');
 }

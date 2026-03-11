@@ -1,12 +1,9 @@
-// Cloudflare Workers polyfill: enterWith() is not implemented in workerd runtime.
-// Patch AsyncLocalStorage before any SDK import so the agents SDK never calls the missing method.
+// Cloudflare Workers polyfill: enterWith() EXISTS in workerd but throws "not implemented".
+// Override it unconditionally before any SDK import.
 import { AsyncLocalStorage } from 'node:async_hooks';
-if (!AsyncLocalStorage.prototype.enterWith) {
-  AsyncLocalStorage.prototype.enterWith = function (store: unknown) {
-    // no-op: context will be set via run() internally by the SDK
-    // This prevents the "enterWith() is not implemented" error on Cloudflare Workers
-  };
-}
+AsyncLocalStorage.prototype.enterWith = function () {
+  // no-op: workerd has this method but throws when called
+};
 
 import { run, RunHandoffOutputItem, RunToolCallOutputItem, setTracingDisabled } from '@openai/agents';
 import { triageAgent, getAgentByName, AGENT_NAMES } from '@/lib/agents';

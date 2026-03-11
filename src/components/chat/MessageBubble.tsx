@@ -94,8 +94,8 @@ const mdComponents: Components = {
   hr: () => <hr className="my-3 border-surface-border" />,
 
   table: ({ children }) => (
-    <div className="my-2 overflow-x-auto rounded-lg">
-      <table className="w-max text-sm border border-surface-border">{children}</table>
+    <div className="my-2 overflow-x-auto rounded-lg max-w-full">
+      <table className="min-w-full text-sm border border-surface-border">{children}</table>
     </div>
   ),
   thead: ({ children }) => (
@@ -180,9 +180,9 @@ function MessageBubble({
         </div>
       )}
 
-      <div className={`flex flex-col gap-1 ${isUser ? "items-end" : "items-start"} ${bubbleMaxW}`}>
+      <div className={`flex flex-col gap-1 min-w-0 ${isUser ? "items-end" : "items-start"} ${bubbleMaxW}`}>
         <div
-          className={`w-fit ${
+          className={`max-w-full overflow-hidden ${
             isUser
               ? "rounded-2xl rounded-br-sm bg-accent text-surface px-4 py-2.5"
               : "rounded-2xl rounded-bl-sm bg-surface-elevated border border-surface-border px-4 py-3"
@@ -196,7 +196,7 @@ function MessageBubble({
           )}
 
           {/* Content */}
-          <div className={`space-y-0.5 break-words ${isUser ? "text-surface" : "text-text-primary"}`}>
+          <div className={`space-y-0.5 break-words overflow-wrap-anywhere ${isUser ? "text-surface" : "text-text-primary"}`}>
             {isUser ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
             ) : (

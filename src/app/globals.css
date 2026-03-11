@@ -173,6 +173,12 @@ html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: oklch(0.600 0.005 285.82 / 0.4);
 }
 
+/* ── Message bubble overflow control ── */
+.overflow-wrap-anywhere {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .animate-in,

@@ -31,9 +31,14 @@ export const metadata: Metadata = {
   description:
     "AI-powered career agent — resume building, ATS analysis, job matching, and cover letter generation.",
   manifest: "/site.webmanifest",
+  robots: {
+    index: false,
+    follow: false,
+  },
   openGraph: {
     title: "My Offer Agent",
-    description: "AI가 이력서부터 취업까지 함께합니다",
+    description:
+      "AI-powered career agent — resume building, ATS analysis, job matching, and cover letter generation.",
     type: "website",
     siteName: "My Offer Agent",
   },

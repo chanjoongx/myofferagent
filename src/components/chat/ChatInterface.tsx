@@ -354,30 +354,33 @@ export default function ChatInterface() {
     preloadPdfJs();
   }, []);
 
-  // 모바일 키보드 뷰포트 대응 — visualViewport resize 시 input 영역 보정
+  // 모바일 키보드 뷰포트 대응 — 컨테이너 높이를 visualViewport에 맞춤
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
+    const root = scrollRef.current?.closest<HTMLDivElement>("[data-chat-root]");
+    if (!root) return;
+
     const onResize = () => {
-      // 키보드가 열리면 visualViewport.height < window.innerHeight
-      // CSS env(safe-area-inset-bottom)으로 대응 불가능한 경우 수동 보정
-      const offset = window.innerHeight - vv.height;
-      const inputArea = scrollRef.current?.parentElement?.querySelector<HTMLDivElement>(
-        ".chat-input-area"
-      );
-      if (inputArea) {
-        inputArea.style.paddingBottom = offset > 50 ? `${offset}px` : "";
-      }
-      // 스크롤 위치 유지
-      scrollRef.current?.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior: "instant",
+      // 키보드가 열리면 visualViewport.height가 줄어듬
+      // 컨테이너 높이를 실제 보이는 영역에 맞춤
+      root.style.height = `${vv.height}px`;
+      // 스크롤 위치를 최하단으로 유지
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "instant",
+        });
       });
     };
 
     vv.addEventListener("resize", onResize);
-    return () => vv.removeEventListener("resize", onResize);
+    vv.addEventListener("scroll", onResize);
+    return () => {
+      vv.removeEventListener("resize", onResize);
+      vv.removeEventListener("scroll", onResize);
+    };
   }, []);
 
   // 로케일 변경 시 전체 대화 리셋 (이전 대화는 다른 언어이므로)
@@ -633,7 +636,7 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full flex-col md:flex-row">
+    <div data-chat-root className="flex h-full flex-col md:flex-row overflow-hidden">
       {/* Sidebar */}
       <aside className="w-full md:w-60 lg:w-64 shrink-0 border-b md:border-b-0 md:border-r border-surface-border glass">
         <AgentStatusPanel

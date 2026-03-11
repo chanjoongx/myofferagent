@@ -321,9 +321,10 @@ export async function POST(req: Request) {
       ? 'An unexpected error occurred. Please try again.'
       : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.';
 
-    // 내부 에러 메시지는 서버 로그에만 남기고, 클라이언트에는 일반 메시지만 전달
+    // 디버그: 실제 에러 메시지를 클라이언트에 전달 (배포 안정화 후 제거)
+    const debugMsg = err instanceof Error ? err.message : String(err);
     return Response.json(
-      { output: fallbackMsg, activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: fallbackMsg } satisfies AgentResponse,
+      { output: fallbackMsg, activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: debugMsg } satisfies AgentResponse,
       { status: 500 },
     );
   }

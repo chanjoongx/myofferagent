@@ -1,6 +1,10 @@
-import { run, RunHandoffOutputItem, RunToolCallOutputItem } from '@openai/agents';
+import { run, RunHandoffOutputItem, RunToolCallOutputItem, setTracingDisabled } from '@openai/agents';
 import { triageAgent, getAgentByName, AGENT_NAMES } from '@/lib/agents';
 import type { AgentRequest, AgentResponse, StructuredData } from '@/lib/types';
+
+// Cloudflare Workers는 AsyncLocalStorage.enterWith()를 지원하지 않음
+// OpenAI Agents SDK 트레이싱 비활성화로 호환성 확보
+setTracingDisabled(true);
 
 /* ── 허용 언어 목록 ── */
 const VALID_LANGUAGES = new Set(['ko', 'en']);
@@ -317,10 +321,9 @@ export async function POST(req: Request) {
       ? 'An unexpected error occurred. Please try again.'
       : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.';
 
-    // 디버그: 배포 후 에러 원인 파악용 (프로덕션 안정화 후 제거)
-    const debugMsg = err instanceof Error ? err.message : String(err);
+    // 내부 에러 메시지는 서버 로그에만 남기고, 클라이언트에는 일반 메시지만 전달
     return Response.json(
-      { output: fallbackMsg, activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: debugMsg } satisfies AgentResponse,
+      { output: fallbackMsg, activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: fallbackMsg } satisfies AgentResponse,
       { status: 500 },
     );
   }

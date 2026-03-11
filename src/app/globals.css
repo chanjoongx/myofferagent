@@ -30,25 +30,28 @@ html.light {
 }
 
 /* ── Mobile viewport (keyboard-aware) ── */
-/* --app-height is set by JS via visualViewport API.
-   Falls back to 100dvh when JS hasn't run yet. */
+/* --vh is set by JS via visualViewport API every resize.
+   Falls back to 1dvh when JS hasn't run yet. */
 :root {
-  --app-height: 100dvh;
+  --vh: 1dvh;
 }
 
 .app-shell {
-  height: 100dvh;
-  height: var(--app-height);
-  /* Prevent iOS rubber-band bounce on the outer shell */
+  /* 100 * --vh = full visible height (keyboard-aware) */
+  height: calc(var(--vh, 1dvh) * 100);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
-  position: fixed;
-  inset: 0;
 }
 
-/* Prevent body scroll ONLY on chat page (has .app-shell) */
+/* Prevent body scroll ONLY on chat page */
 body:has(.app-shell) {
   overflow: hidden;
   overscroll-behavior: none;
+  /* Prevent iOS Safari from scrolling the body behind keyboard */
+  position: fixed;
+  inset: 0;
+  width: 100%;
 }
 
 body {

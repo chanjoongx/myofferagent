@@ -354,28 +354,34 @@ export default function ChatInterface() {
     preloadPdfJs();
   }, []);
 
-  // 모바일 키보드 뷰포트 대응 — ChatGPT/Claude 앱 방식
-  // visualViewport API로 키보드 높이를 감지하고 CSS 변수로 전달
+  // 모바일 키보드 뷰포트 대응
+  // --vh CSS 변수를 visualViewport.height / 100 으로 갱신
+  // 이렇게 하면 .app-shell { height: calc(var(--vh) * 100) } 가
+  // 키보드 열림/닫힘에 따라 자동으로 줄어들고 늘어남
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
     let rafId = 0;
+    let prevHeight = 0;
 
-    const syncViewport = () => {
+    const syncVh = () => {
+      // 높이가 변하지 않았으면 skip (불필요한 리플로우 방지)
+      const h = vv.height;
+      if (h === prevHeight) return;
+      prevHeight = h;
+
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        // CSS custom property로 실제 보이는 높이 전달
-        document.documentElement.style.setProperty(
-          "--app-height",
-          `${vv.height}px`
-        );
-        // iOS Safari에서 키보드 열릴 때 스크롤 오프셋 보정
-        // visualViewport.offsetTop이 0이 아니면 페이지가 밀린 상태
+        // --vh를 실제 보이는 높이의 1%로 설정
+        document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
+
+        // iOS Safari body 스크롤 보정
         if (vv.offsetTop > 0) {
           window.scrollTo(0, 0);
         }
-        // 메시지 영역 최하단으로 스크롤
+
+        // 메시지 영역을 최하단으로
         scrollRef.current?.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: "instant",
@@ -383,16 +389,15 @@ export default function ChatInterface() {
       });
     };
 
-    // 초기값 세팅
-    syncViewport();
+    syncVh();
+    vv.addEventListener("resize", syncVh);
+    vv.addEventListener("scroll", syncVh);
 
-    vv.addEventListener("resize", syncViewport);
-    vv.addEventListener("scroll", syncViewport);
     return () => {
-      vv.removeEventListener("resize", syncViewport);
-      vv.removeEventListener("scroll", syncViewport);
+      vv.removeEventListener("resize", syncVh);
+      vv.removeEventListener("scroll", syncVh);
       cancelAnimationFrame(rafId);
-      document.documentElement.style.removeProperty("--app-height");
+      document.documentElement.style.removeProperty("--vh");
     };
   }, []);
 
@@ -418,12 +423,18 @@ export default function ChatInterface() {
     ]);
   }, [locale, t]);
 
-  // 자동 스크롤
+  // 자동 스크롤 — 레이아웃 완료 후 실행
   useEffect(() => {
-    scrollRef.current?.scrollTo({
-      top: scrollRef.current.scrollHeight,
-      behavior: "smooth",
+    // 두 프레임 대기: 1프레임(DOM 갱신) + 1프레임(레이아웃 반영)
+    const id = requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        scrollRef.current?.scrollTo({
+          top: scrollRef.current.scrollHeight,
+          behavior: "smooth",
+        });
+      });
     });
+    return () => cancelAnimationFrame(id);
   }, [messages, isLoading]);
 
   // 메시지 가상화 — 최근 N개만 렌더링 (성능 최적화)
@@ -650,8 +661,8 @@ export default function ChatInterface() {
 
   return (
     <div className="flex h-full flex-col md:flex-row overflow-hidden">
-      {/* Sidebar */}
-      <aside className="w-full md:w-60 lg:w-64 shrink-0 border-b md:border-b-0 md:border-r border-surface-border glass">
+      {/* Sidebar — 모바일에서는 max-h 제한으로 채팅 영역 확보 */}
+      <aside className="w-full max-h-[30vh] md:max-h-none md:w-60 lg:w-64 shrink-0 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass">
         <AgentStatusPanel
           currentAgent={currentAgent}
           completedAgents={completedAgents}
@@ -661,8 +672,8 @@ export default function ChatInterface() {
         />
       </aside>
 
-      {/* Chat Area */}
-      <div className="flex flex-1 flex-col min-w-0">
+      {/* Chat Area — min-h-0으로 flex shrink 허용 */}
+      <div className="flex flex-1 flex-col min-w-0 min-h-0">
         {/* Messages */}
         <div
           ref={scrollRef}

@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="public/brand/logo.svg" alt="My Offer Agent" width="90" height="90" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/logo.svg" alt="My Offer Agent" width="90" height="90" />
 
 <br />
 <br />
@@ -9,7 +9,7 @@
 
 **AI-Powered Career Agent** — From resume building to job matching,<br />powered by 6 specialized AI agents.
 
-Built for the **2026 Global PBL Hackathon** in Irvine, CA.
+Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA.
 
 <br />
 
@@ -53,7 +53,7 @@ Upload your resume, search for jobs, get ATS analysis, and generate tailored cov
 ## Architecture
 
 <div align="center">
-<img src="public/brand/architecture.svg" alt="Agent Architecture" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/architecture.svg" alt="Agent Architecture" width="960" />
 </div>
 
 <br />

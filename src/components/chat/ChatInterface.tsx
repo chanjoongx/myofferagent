@@ -660,9 +660,9 @@ export default function ChatInterface() {
   };
 
   return (
-    <div className="flex h-full flex-col md:flex-row overflow-hidden">
-      {/* Sidebar — 모바일에서는 max-h 제한으로 채팅 영역 확보 */}
-      <aside className="w-full max-h-[30vh] md:max-h-none md:w-60 lg:w-64 shrink-0 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass">
+    <div className="flex flex-1 min-h-0 flex-col md:flex-row">
+      {/* Sidebar — 모바일에서는 shrink로 줄어들 수 있게 */}
+      <aside className="w-full shrink-0 md:w-60 lg:w-64 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass">
         <AgentStatusPanel
           currentAgent={currentAgent}
           completedAgents={completedAgents}
@@ -672,15 +672,15 @@ export default function ChatInterface() {
         />
       </aside>
 
-      {/* Chat Area — min-h-0으로 flex shrink 허용 */}
-      <div className="flex flex-1 flex-col min-w-0 min-h-0">
-        {/* Messages */}
+      {/* Chat Area — 체인 전체에 min-h-0 + overflow-hidden */}
+      <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
+        {/* Messages — flex-1 + min-h-0으로 스크롤 활성화 */}
         <div
           ref={scrollRef}
           role="log"
           aria-live="polite"
           aria-label={t("chat.messageList")}
-          className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 custom-scrollbar"
+          className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 custom-scrollbar"
         >
           {/* 메시지 수 초과 시 안내 */}
           {messages.length > MAX_RENDERED_MESSAGES && (

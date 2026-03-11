@@ -13,7 +13,7 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA.
 
 <br />
 
-<a href="https://myofferagent.com">Website</a> · <a href="https://github.com/chanjoongx/myofferagent/issues">Issues</a> · <a href="#getting-started">Getting Started</a>
+<a href="https://myofferagent.com">Website</a> · <a href="#getting-started">Getting Started</a>
 
 <br />
 

@@ -332,6 +332,8 @@ export default function ChatInterface() {
   const [attachedFile, setAttachedFile] = useState<string | null>(null);
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
 
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
   const sessionIdRef = useRef(generateSessionId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -340,6 +342,7 @@ export default function ChatInterface() {
   const abortControllerRef = useRef<AbortController | null>(null);
   const lastSendTimeRef = useRef(0);
   const resizeRafRef = useRef<number>(0);
+  const fullHeightRef = useRef(0);
 
   // 언마운트 시 진행 중인 요청 취소
   useEffect(() => {
@@ -364,24 +367,31 @@ export default function ChatInterface() {
 
     let rafId = 0;
     let prevHeight = 0;
+    // 초기 전체 높이 기록 (키보드 열림 판단 기준)
+    fullHeightRef.current = vv.height;
 
     const syncVh = () => {
-      // 높이가 변하지 않았으면 skip (불필요한 리플로우 방지)
       const h = vv.height;
       if (h === prevHeight) return;
       prevHeight = h;
 
+      // 전체 높이 갱신 (키보드 닫혔을 때의 높이를 추적)
+      if (h > fullHeightRef.current) {
+        fullHeightRef.current = h;
+      }
+
+      // 키보드 열림 판단: 뷰포트가 전체의 75% 이하로 줄어들면 키보드가 열린 것
+      const isKbOpen = h < fullHeightRef.current * 0.75;
+      setKeyboardOpen(isKbOpen);
+
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
-        // --vh를 실제 보이는 높이의 1%로 설정
         document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
 
-        // iOS Safari body 스크롤 보정
         if (vv.offsetTop > 0) {
           window.scrollTo(0, 0);
         }
 
-        // 메시지 영역을 최하단으로
         scrollRef.current?.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: "instant",
@@ -661,8 +671,8 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-      {/* Sidebar — 모바일에서는 shrink로 줄어들 수 있게 */}
-      <aside className="w-full shrink-0 md:w-60 lg:w-64 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass">
+      {/* Sidebar — 모바일에서 키보드 열리면 숨김 */}
+      <aside className={`w-full shrink-0 md:w-60 lg:w-64 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass ${keyboardOpen ? "hidden md:block" : ""}`}>
         <AgentStatusPanel
           currentAgent={currentAgent}
           completedAgents={completedAgents}

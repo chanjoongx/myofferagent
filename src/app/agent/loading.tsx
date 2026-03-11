@@ -1,6 +1,6 @@
 export default function AgentLoading() {
   return (
-    <div className="flex h-dvh w-full">
+    <div className="flex app-shell w-full">
       {/* Sidebar skeleton */}
       <div className="hidden md:flex w-60 lg:w-64 shrink-0 flex-col border-r border-surface-border glass p-5 gap-4">
         {/* Logo */}

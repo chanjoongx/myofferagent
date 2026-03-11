@@ -29,6 +29,28 @@ html.light {
   --color-accent-hover: oklch(0.530 0.200 163.22);
 }
 
+/* ── Mobile viewport (keyboard-aware) ── */
+/* --app-height is set by JS via visualViewport API.
+   Falls back to 100dvh when JS hasn't run yet. */
+:root {
+  --app-height: 100dvh;
+}
+
+.app-shell {
+  height: 100dvh;
+  height: var(--app-height);
+  /* Prevent iOS rubber-band bounce on the outer shell */
+  overflow: hidden;
+  position: fixed;
+  inset: 0;
+}
+
+/* Prevent body scroll ONLY on chat page (has .app-shell) */
+body:has(.app-shell) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body {
   background: var(--color-surface);
   color: var(--color-text-primary);

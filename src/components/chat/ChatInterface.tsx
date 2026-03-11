@@ -354,20 +354,28 @@ export default function ChatInterface() {
     preloadPdfJs();
   }, []);
 
-  // 모바일 키보드 뷰포트 대응 — 컨테이너 높이를 visualViewport에 맞춤
+  // 모바일 키보드 뷰포트 대응 — ChatGPT/Claude 앱 방식
+  // visualViewport API로 키보드 높이를 감지하고 CSS 변수로 전달
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
-    const root = scrollRef.current?.closest<HTMLDivElement>("[data-chat-root]");
-    if (!root) return;
+    let rafId = 0;
 
-    const onResize = () => {
-      // 키보드가 열리면 visualViewport.height가 줄어듬
-      // 컨테이너 높이를 실제 보이는 영역에 맞춤
-      root.style.height = `${vv.height}px`;
-      // 스크롤 위치를 최하단으로 유지
-      requestAnimationFrame(() => {
+    const syncViewport = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        // CSS custom property로 실제 보이는 높이 전달
+        document.documentElement.style.setProperty(
+          "--app-height",
+          `${vv.height}px`
+        );
+        // iOS Safari에서 키보드 열릴 때 스크롤 오프셋 보정
+        // visualViewport.offsetTop이 0이 아니면 페이지가 밀린 상태
+        if (vv.offsetTop > 0) {
+          window.scrollTo(0, 0);
+        }
+        // 메시지 영역 최하단으로 스크롤
         scrollRef.current?.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: "instant",
@@ -375,11 +383,16 @@ export default function ChatInterface() {
       });
     };
 
-    vv.addEventListener("resize", onResize);
-    vv.addEventListener("scroll", onResize);
+    // 초기값 세팅
+    syncViewport();
+
+    vv.addEventListener("resize", syncViewport);
+    vv.addEventListener("scroll", syncViewport);
     return () => {
-      vv.removeEventListener("resize", onResize);
-      vv.removeEventListener("scroll", onResize);
+      vv.removeEventListener("resize", syncViewport);
+      vv.removeEventListener("scroll", syncViewport);
+      cancelAnimationFrame(rafId);
+      document.documentElement.style.removeProperty("--app-height");
     };
   }, []);
 
@@ -636,7 +649,7 @@ export default function ChatInterface() {
   };
 
   return (
-    <div data-chat-root className="flex h-full flex-col md:flex-row overflow-hidden">
+    <div className="flex h-full flex-col md:flex-row overflow-hidden">
       {/* Sidebar */}
       <aside className="w-full md:w-60 lg:w-64 shrink-0 border-b md:border-b-0 md:border-r border-surface-border glass">
         <AgentStatusPanel
@@ -656,7 +669,7 @@ export default function ChatInterface() {
           role="log"
           aria-live="polite"
           aria-label={t("chat.messageList")}
-          className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar"
+          className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 custom-scrollbar"
         >
           {/* 메시지 수 초과 시 안내 */}
           {messages.length > MAX_RENDERED_MESSAGES && (
@@ -746,8 +759,8 @@ export default function ChatInterface() {
           )}
         </div>
 
-        {/* Input area — chat-input-area 클래스로 모바일 키보드 대응 */}
-        <div className="chat-input-area border-t border-surface-border bg-surface/80 backdrop-blur px-4 py-3">
+        {/* Input area — shrink-0으로 고정, safe-area 패딩 적용 */}
+        <div className="shrink-0 border-t border-surface-border bg-surface/80 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {attachedFile && (
             <div className="mb-2 inline-flex items-center gap-2 rounded-lg bg-accent/8 border border-accent/20 px-3 py-1.5 text-xs text-accent">
               <FileText className="h-3.5 w-3.5" />
@@ -790,7 +803,7 @@ export default function ChatInterface() {
               placeholder={t("chat.placeholder")}
               aria-label={t("chat.placeholder")}
               rows={1}
-              className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-elevated px-4 py-2.5 text-sm text-text-primary placeholder:text-text-secondary/50 outline-none transition-colors focus:border-accent/40 focus:ring-1 focus:ring-accent/20"
+              className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-elevated px-4 py-2.5 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/50 outline-none transition-colors focus:border-accent/40 focus:ring-1 focus:ring-accent/20"
             />
 
             <button

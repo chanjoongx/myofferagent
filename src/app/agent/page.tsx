@@ -4,7 +4,7 @@ import ChatInterface from "@/components/chat/ChatInterface";
 
 export default function AgentPage() {
   return (
-    <div className="h-dvh w-full overflow-hidden">
+    <div className="app-shell w-full overflow-hidden">
       <ChatInterface />
     </div>
   );

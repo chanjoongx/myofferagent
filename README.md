@@ -50,6 +50,38 @@ Upload your resume, search for jobs, get ATS analysis, and generate tailored cov
 
 <br />
 
+## Demo
+
+### 💬 Smart Conversation & Agent Handoff
+
+<div align="center">
+<img src="https://github.com/user-attachments/assets/7ca3a988-5f33-43eb-83de-43c5c99876d4" alt="Chat Demo — Greeting, capabilities, and automatic agent handoff" width="960" />
+</div>
+
+> The Triage agent greets users, explains available features, and automatically hands off to the right specialist — like Job Scout — when it detects intent.
+
+<br />
+
+### 📄 ATS Resume Analysis
+
+<div align="center">
+<img src="https://github.com/user-attachments/assets/cace0ec4-509c-4f75-a96c-2edbc35984af" alt="Resume Demo — Upload, ATS scoring, and detailed feedback" width="960" />
+</div>
+
+> Upload a PDF resume and get a 100-point ATS compatibility score with section-by-section breakdown and actionable improvement suggestions.
+
+<br />
+
+### 🔍 Job Search & Match Strategy
+
+<div align="center">
+<img src="https://github.com/user-attachments/assets/b82cfd4f-1abd-4c92-a5c5-de9d259f5d71" alt="Job Demo — Real-time search and personalized match analysis" width="960" />
+</div>
+
+> Search for jobs in real-time, then get a personalized match analysis comparing your resume against specific job requirements.
+
+<br />
+
 ## Architecture
 
 <div align="center">

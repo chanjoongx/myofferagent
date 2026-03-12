@@ -187,17 +187,62 @@ export default memo(function AgentStatusPanel({
                 );
               })}
             </div>
-            {/* Mobile new conversation button */}
-            {onNewConversation && (
-              <button
-                onClick={() => { onNewConversation(); setMobileOpen(false); }}
-                disabled={isLoading}
-                className="mt-2 flex items-center justify-center gap-1.5 rounded-lg border border-surface-border bg-surface-elevated/40 px-3 py-1.5 text-[11px] text-text-secondary transition-colors hover:border-accent/40 hover:text-accent w-full disabled:opacity-40"
+            {/* Mobile bottom controls */}
+            <div className="mt-2 flex items-center gap-2">
+              {/* Home */}
+              <Link
+                href="/"
+                onClick={() => setMobileOpen(false)}
+                className="flex h-8 items-center justify-center rounded-lg border border-surface-border bg-surface-elevated/40 px-2.5 text-text-secondary hover:border-accent/40 hover:text-accent transition-colors"
+                aria-label="Go to home page"
               >
-                <Plus className="h-3 w-3" />
-                {t("sidebar.newChat")}
+                <Zap className="h-3.5 w-3.5" strokeWidth={2} />
+              </Link>
+
+              {/* New conversation */}
+              {onNewConversation && (
+                <button
+                  onClick={() => { onNewConversation(); setMobileOpen(false); }}
+                  disabled={isLoading}
+                  className="flex h-8 flex-1 items-center justify-center gap-1.5 rounded-lg border border-surface-border bg-surface-elevated/40 text-[11px] text-text-secondary transition-colors hover:border-accent/40 hover:text-accent disabled:opacity-40"
+                >
+                  <Plus className="h-3 w-3" />
+                  {t("sidebar.newChat")}
+                </button>
+              )}
+
+              {/* Language toggle */}
+              <button
+                onClick={() => { setLocale(locale === "ko" ? "en" : "ko"); }}
+                className="flex h-8 items-center justify-center gap-1 rounded-lg border border-surface-border bg-surface-elevated/40 px-2.5 text-[11px] text-text-secondary hover:border-accent/40 hover:text-text-primary transition-colors"
+                aria-label={`Switch to ${locale === "ko" ? "English" : "한국어"}`}
+              >
+                <Languages className="h-3 w-3" />
+                <span>{locale === "ko" ? "EN" : "한"}</span>
               </button>
-            )}
+
+              {/* Theme toggle */}
+              <div className="flex h-8 rounded-lg border border-surface-border overflow-hidden">
+                {THEME_OPTIONS.map((opt) => {
+                  const Icon = opt.icon;
+                  const isActive = theme === opt.value;
+                  return (
+                    <button
+                      key={opt.value}
+                      onClick={() => setTheme(opt.value)}
+                      className={`flex items-center justify-center w-8 transition-colors ${
+                        isActive
+                          ? "bg-accent/15 text-accent"
+                          : "bg-surface-elevated/40 text-text-secondary hover:text-text-primary"
+                      }`}
+                      aria-label={t(opt.labelKey)}
+                    >
+                      <Icon className="h-3 w-3" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         )}
       </div>

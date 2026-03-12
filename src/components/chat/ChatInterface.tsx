@@ -802,11 +802,11 @@ export default function ChatInterface() {
           <div className="flex items-end gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary hover:border-accent/30"
+              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary hover:border-accent/30 active:bg-surface-elevated"
               title={t("chat.pdfTooltip")}
               aria-label={t("chat.pdfTooltip")}
             >
-              <Paperclip className="h-4 w-4" />
+              <Paperclip className="h-5 w-5" />
             </button>
             <input
               ref={fileInputRef}
@@ -830,10 +830,10 @@ export default function ChatInterface() {
             <button
               onClick={sendMessage}
               disabled={isLoading || (!input.trim() && !resumeText)}
-              className="shrink-0 flex h-9 w-9 items-center justify-center rounded-lg bg-accent text-surface transition-all hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-surface transition-all hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
               aria-label={t("chat.send")}
             >
-              <ArrowUp className="h-4 w-4" strokeWidth={2.5} />
+              <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
             </button>
           </div>
         </div>

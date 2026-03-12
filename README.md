@@ -9,7 +9,11 @@
 
 **AI-Powered Career Agent** — From resume building to job matching,<br />powered by 6 specialized AI agents.
 
-Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA.
+Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myofferagent.com](https://myofferagent.com)
+
+<br />
+
+🚀 **Solo Project** · 6 AI Agents · Built in 1 Week · [Try it live →](https://myofferagent.com)
 
 <br />
 
@@ -38,9 +42,9 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA.
 
 ## About
 
-**My Offer Agent** is a conversational career assistant where 6 specialized AI agents collaborate to help you land your next job.
+Job seekers often juggle multiple tools — resume builders, job boards, ATS checkers, and cover letter generators. **My Offer Agent** brings it all into one conversational interface.
 
-Upload your resume, search for jobs, get ATS analysis, and generate tailored cover letters — all through a single chat interface. Each agent handles a specific domain and seamlessly hands off to the next when needed, powered by the [OpenAI Agents SDK](https://github.com/openai/openai-agents-js).
+It's a career assistant where 6 specialized AI agents collaborate to help you land your next job. Upload your resume, search for jobs, get ATS analysis, and generate tailored cover letters — all through a single chat. Each agent handles a specific domain and seamlessly hands off to the next when needed, powered by the [OpenAI Agents SDK](https://github.com/openai/openai-agents-js).
 
 <br />
 

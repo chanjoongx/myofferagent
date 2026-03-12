@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" fill="none">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 540" fill="none">
   <defs>
     <linearGradient id="accentGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#0f766e"/>
@@ -11,114 +11,119 @@
   </defs>
 
   <!-- Background -->
-  <rect width="960" height="520" rx="16" fill="#0a0a14"/>
-  <rect width="960" height="520" rx="16" fill="url(#accentGrad)" opacity="0.03"/>
+  <rect width="960" height="540" rx="16" fill="#0a0a14"/>
+  <rect width="960" height="540" rx="16" fill="url(#accentGrad)" opacity="0.03"/>
 
   <!-- Title -->
   <text x="480" y="38" text-anchor="middle" fill="#a1a1aa" font-family="system-ui, -apple-system, sans-serif" font-size="13" font-weight="500" letter-spacing="2">AGENT ARCHITECTURE</text>
 
-  <!-- ═══ USER ═══ -->
-  <rect x="395" y="60" width="170" height="52" rx="26" fill="url(#accentGrad)"/>
-  <text x="480" y="91" text-anchor="middle" fill="#ffffff" font-family="system-ui, sans-serif" font-size="15" font-weight="600">User Message</text>
+  <!-- ═══ USER MESSAGE ═══ -->
+  <rect x="395" y="56" width="170" height="50" rx="25" fill="url(#accentGrad)"/>
+  <text x="480" y="86" text-anchor="middle" fill="#ffffff" font-family="system-ui, sans-serif" font-size="15" font-weight="600">User Message</text>
 
   <!-- Arrow: User → Smart Router -->
-  <line x1="480" y1="112" x2="480" y2="148" stroke="#14b8a6" stroke-width="2" opacity="0.6"/>
-  <polygon points="480,155 475,146 485,146" fill="#14b8a6" opacity="0.6"/>
+  <line x1="480" y1="106" x2="480" y2="140" stroke="#14b8a6" stroke-width="2" opacity="0.6"/>
+  <polygon points="480,147 475,139 485,139" fill="#14b8a6" opacity="0.6"/>
 
   <!-- ═══ SMART ROUTER ═══ -->
-  <rect x="330" y="158" width="300" height="52" rx="10" fill="url(#cardGrad)" stroke="#14b8a6" stroke-width="1.5" opacity="0.9"/>
-  <text x="480" y="180" text-anchor="middle" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1">SERVER-SIDE</text>
-  <text x="480" y="198" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Smart Router (Regex)</text>
+  <rect x="310" y="150" width="340" height="52" rx="10" fill="url(#cardGrad)" stroke="#14b8a6" stroke-width="1.5" opacity="0.9"/>
+  <text x="480" y="172" text-anchor="middle" fill="#14b8a6" font-family="system-ui, sans-serif" font-size="11" font-weight="600" letter-spacing="1">SERVER-SIDE</text>
+  <text x="480" y="190" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Smart Router (Regex + Context)</text>
 
-  <!-- Arrow: Smart Router → Triage -->
-  <line x1="480" y1="210" x2="480" y2="246" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.4"/>
-  <text x="488" y="234" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">fallback</text>
-  <polygon points="480,252 475,244 485,244" fill="#a1a1aa" opacity="0.4"/>
+  <!-- Note: direct routing capability -->
+  <text x="480" y="216" text-anchor="middle" fill="#52525b" font-family="system-ui, sans-serif" font-size="9" font-style="italic">routes directly to any agent when intent is clear</text>
+
+  <!-- Arrow: Smart Router → Triage (fallback, dashed) -->
+  <line x1="480" y1="202" x2="480" y2="240" stroke="#a1a1aa" stroke-width="1.5" stroke-dasharray="5,4" opacity="0.4"/>
+  <text x="500" y="233" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">fallback</text>
+  <polygon points="480,246 475,238 485,238" fill="#a1a1aa" opacity="0.4"/>
 
   <!-- ═══ TRIAGE AGENT ═══ -->
-  <rect x="370" y="255" width="220" height="48" rx="10" fill="url(#cardGrad)" stroke="#8b5cf6" stroke-width="1.5"/>
-  <circle cx="392" cy="279" r="8" fill="#8b5cf6" opacity="0.3"/>
-  <circle cx="392" cy="279" r="4" fill="#8b5cf6"/>
-  <text x="480" y="284" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Triage Agent</text>
+  <rect x="370" y="250" width="220" height="46" rx="10" fill="url(#cardGrad)" stroke="#8b5cf6" stroke-width="1.5"/>
+  <circle cx="392" cy="273" r="8" fill="#8b5cf6" opacity="0.3"/>
+  <circle cx="392" cy="273" r="4" fill="#8b5cf6"/>
+  <text x="480" y="278" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="14" font-weight="600">Triage Agent</text>
 
-  <!-- ═══ FAN-OUT ARROWS (with arrowheads) ═══ -->
-  <!-- → Resume Builder -->
-  <path d="M 410 303 Q 410 340 130 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
-  <polygon points="126,350 134,346 134,354" fill="#a1a1aa" opacity="0.35"/>
+  <!-- ═══ FAN-OUT: Triage → Builder, Analyzer, Scout ONLY ═══ -->
+  <!-- → Resume Builder (center x=115) -->
+  <path d="M 410 296 Q 410 335 119 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
+  <polygon points="115,350 123,346 123,354" fill="#a1a1aa" opacity="0.35"/>
 
-  <!-- → Resume Analyzer -->
-  <path d="M 440 303 Q 440 335 310 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
-  <polygon points="306,350 314,346 314,354" fill="#a1a1aa" opacity="0.35"/>
+  <!-- → Resume Analyzer (center x=299) -->
+  <path d="M 440 296 Q 440 330 303 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
+  <polygon points="299,350 307,346 307,354" fill="#a1a1aa" opacity="0.35"/>
 
-  <!-- → Job Scout -->
-  <line x1="480" y1="303" x2="480" y2="350" stroke="#a1a1aa" stroke-width="1.2" opacity="0.35"/>
-  <polygon points="480,356 475,348 485,348" fill="#a1a1aa" opacity="0.35"/>
+  <!-- → Job Scout (center x=483) -->
+  <line x1="480" y1="296" x2="480" y2="344" stroke="#a1a1aa" stroke-width="1.2" opacity="0.35"/>
+  <polygon points="480,350 475,342 485,342" fill="#a1a1aa" opacity="0.35"/>
 
-  <!-- → Match Strategy -->
-  <path d="M 520 303 Q 520 335 650 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
-  <polygon points="654,350 646,346 646,354" fill="#a1a1aa" opacity="0.35"/>
+  <!-- ═══ 5 SPECIALIST AGENT CARDS ═══ -->
 
-  <!-- → Application Writer -->
-  <path d="M 550 303 Q 550 340 810 350" stroke="#a1a1aa" stroke-width="1.2" fill="none" opacity="0.35"/>
-  <polygon points="814,350 806,346 806,354" fill="#a1a1aa" opacity="0.35"/>
+  <!-- Agent 1: Resume Builder  |  tools: generateResumeMarkdown  |  handoff → Analyzer -->
+  <rect x="30" y="355" width="170" height="104" rx="10" fill="url(#cardGrad)" stroke="#3b82f6" stroke-width="1.2"/>
+  <rect x="30" y="355" width="170" height="3" rx="1.5" fill="#3b82f6"/>
+  <text x="115" y="382" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Resume Builder</text>
+  <text x="115" y="400" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Build ATS-optimized</text>
+  <text x="115" y="413" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">resumes via conversation</text>
+  <text x="115" y="446" text-anchor="middle" fill="#3b82f6" font-family="monospace" font-size="8" opacity="0.7">generateResumeMarkdown()</text>
 
-  <!-- ═══ 5 SPECIALIST AGENTS (equal width) ═══ -->
+  <!-- Agent 2: Resume Analyzer  |  tools: parseResumeText + calculateATSScore  |  handoff → Scout -->
+  <rect x="214" y="355" width="170" height="104" rx="10" fill="url(#cardGrad)" stroke="#f59e0b" stroke-width="1.2"/>
+  <rect x="214" y="355" width="170" height="3" rx="1.5" fill="#f59e0b"/>
+  <text x="299" y="382" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Resume Analyzer</text>
+  <text x="299" y="400" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">100-point ATS scoring</text>
+  <text x="299" y="413" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">with section breakdown</text>
+  <text x="299" y="437" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="8" opacity="0.7">parseResumeText()</text>
+  <text x="299" y="449" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="8" opacity="0.7">calculateATSScore()</text>
 
-  <!-- Agent 1: Resume Builder -->
-  <rect x="30" y="360" width="170" height="96" rx="10" fill="url(#cardGrad)" stroke="#3b82f6" stroke-width="1.2"/>
-  <rect x="30" y="360" width="170" height="3" rx="1.5" fill="#3b82f6"/>
-  <text x="115" y="390" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Resume Builder</text>
-  <text x="115" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Build ATS-optimized</text>
-  <text x="115" y="424" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">resumes via conversation</text>
-  <text x="115" y="446" text-anchor="middle" fill="#3b82f6" font-family="monospace" font-size="9" opacity="0.7">generateResume()</text>
+  <!-- Agent 3: Job Scout  |  tools: webSearchTool  |  handoff: none (server routing to Match) -->
+  <rect x="398" y="355" width="170" height="104" rx="10" fill="url(#cardGrad)" stroke="#22c55e" stroke-width="1.2"/>
+  <rect x="398" y="355" width="170" height="3" rx="1.5" fill="#22c55e"/>
+  <text x="483" y="382" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Job Scout</text>
+  <text x="483" y="400" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Real-time web search</text>
+  <text x="483" y="413" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">for job postings</text>
+  <text x="483" y="446" text-anchor="middle" fill="#22c55e" font-family="monospace" font-size="8" opacity="0.7">webSearchTool()</text>
 
-  <!-- Agent 2: Resume Analyzer -->
-  <rect x="214" y="360" width="170" height="96" rx="10" fill="url(#cardGrad)" stroke="#f59e0b" stroke-width="1.2"/>
-  <rect x="214" y="360" width="170" height="3" rx="1.5" fill="#f59e0b"/>
-  <text x="299" y="390" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Resume Analyzer</text>
-  <text x="299" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">100-point ATS scoring</text>
-  <text x="299" y="424" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">with section breakdown</text>
-  <text x="299" y="446" text-anchor="middle" fill="#f59e0b" font-family="monospace" font-size="9" opacity="0.7">calculateAtsScore()</text>
+  <!-- Agent 4: Match Strategy  |  tools: NONE (LLM reasoning)  |  handoff → Writer -->
+  <rect x="582" y="355" width="170" height="104" rx="10" fill="url(#cardGrad)" stroke="#ec4899" stroke-width="1.2"/>
+  <rect x="582" y="355" width="170" height="3" rx="1.5" fill="#ec4899"/>
+  <text x="667" y="382" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Match Strategy</text>
+  <text x="667" y="400" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Resume-job fit analysis</text>
+  <text x="667" y="413" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">with actionable insights</text>
+  <text x="667" y="446" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="9" font-style="italic" opacity="0.5">LLM reasoning only</text>
 
-  <!-- Agent 3: Job Scout -->
-  <rect x="398" y="360" width="170" height="96" rx="10" fill="url(#cardGrad)" stroke="#22c55e" stroke-width="1.2"/>
-  <rect x="398" y="360" width="170" height="3" rx="1.5" fill="#22c55e"/>
-  <text x="483" y="390" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Job Scout</text>
-  <text x="483" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Real-time web search</text>
-  <text x="483" y="424" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">for job postings</text>
-  <text x="483" y="446" text-anchor="middle" fill="#22c55e" font-family="monospace" font-size="9" opacity="0.7">webSearchTool()</text>
+  <!-- Agent 5: Application Writer  |  tools: generateResumeMarkdown  |  handoff: none (terminal) -->
+  <rect x="766" y="355" width="170" height="104" rx="10" fill="url(#cardGrad)" stroke="#a855f7" stroke-width="1.2"/>
+  <rect x="766" y="355" width="170" height="3" rx="1.5" fill="#a855f7"/>
+  <text x="851" y="382" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Application Writer</text>
+  <text x="851" y="400" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Cover letters &amp;</text>
+  <text x="851" y="413" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">optimized resumes</text>
+  <text x="851" y="446" text-anchor="middle" fill="#a855f7" font-family="monospace" font-size="8" opacity="0.7">generateResumeMarkdown()</text>
 
-  <!-- Agent 4: Match Strategy -->
-  <rect x="582" y="360" width="170" height="96" rx="10" fill="url(#cardGrad)" stroke="#ec4899" stroke-width="1.2"/>
-  <rect x="582" y="360" width="170" height="3" rx="1.5" fill="#ec4899"/>
-  <text x="667" y="390" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Match Strategy</text>
-  <text x="667" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Resume-job fit analysis</text>
-  <text x="667" y="424" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">with actionable insights</text>
-  <text x="667" y="446" text-anchor="middle" fill="#ec4899" font-family="monospace" font-size="9" opacity="0.7">parseResumeText()</text>
+  <!-- ═══ INTER-AGENT HANDOFF ARROWS ═══ -->
 
-  <!-- Agent 5: Application Writer -->
-  <rect x="766" y="360" width="170" height="96" rx="10" fill="url(#cardGrad)" stroke="#a855f7" stroke-width="1.2"/>
-  <rect x="766" y="360" width="170" height="3" rx="1.5" fill="#a855f7"/>
-  <text x="851" y="390" text-anchor="middle" fill="#e4e4e7" font-family="system-ui, sans-serif" font-size="13" font-weight="600">Application Writer</text>
-  <text x="851" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Cover letters &amp;</text>
-  <text x="851" y="424" text-anchor="middle" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">optimized resumes</text>
-  <text x="851" y="446" text-anchor="middle" fill="#a855f7" font-family="monospace" font-size="9" opacity="0.7">generateResume()</text>
+  <!-- Builder → Analyzer (LLM handoff) -->
+  <line x1="200" y1="407" x2="214" y2="407" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <polygon points="214,407 208,404 208,410" fill="#71717a" opacity="0.5"/>
 
-  <!-- ═══ HANDOFF ARROWS (between agents) ═══ -->
-  <!-- Scout → Match -->
-  <line x1="568" y1="408" x2="582" y2="408" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
-  <polygon points="582,408 576,405 576,411" fill="#71717a" opacity="0.5"/>
+  <!-- Analyzer → Scout (LLM handoff) -->
+  <line x1="384" y1="407" x2="398" y2="407" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <polygon points="398,407 392,404 392,410" fill="#71717a" opacity="0.5"/>
 
-  <!-- Match → Writer -->
-  <line x1="752" y1="408" x2="766" y2="408" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
-  <polygon points="766,408 760,405 760,411" fill="#71717a" opacity="0.5"/>
+  <!-- Scout → Match (SERVER-SIDE routing — solid teal) -->
+  <line x1="568" y1="407" x2="582" y2="407" stroke="#14b8a6" stroke-width="1.5" opacity="0.6"/>
+  <polygon points="582,407 576,404 576,410" fill="#14b8a6" opacity="0.6"/>
+
+  <!-- Match → Writer (LLM handoff) -->
+  <line x1="752" y1="407" x2="766" y2="407" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <polygon points="766,407 760,404 760,410" fill="#71717a" opacity="0.5"/>
 
   <!-- ═══ LEGEND ═══ -->
-  <line x1="40" y1="494" x2="65" y2="494" stroke="#a1a1aa" stroke-width="1.5" opacity="0.5"/>
-  <polygon points="65,494 59,491 59,497" fill="#a1a1aa" opacity="0.5"/>
-  <text x="75" y="498" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Direct routing</text>
+  <line x1="40" y1="510" x2="65" y2="510" stroke="#14b8a6" stroke-width="1.5" opacity="0.6"/>
+  <polygon points="65,510 59,507 59,513" fill="#14b8a6" opacity="0.6"/>
+  <text x="75" y="514" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">Direct / server-side routing</text>
 
-  <line x1="200" y1="494" x2="225" y2="494" stroke="#71717a" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
-  <polygon points="225,494 219,491 219,497" fill="#71717a" opacity="0.5"/>
-  <text x="235" y="498" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">LLM fallback / agent handoff</text>
+  <line x1="280" y1="510" x2="305" y2="510" stroke="#a1a1aa" stroke-width="1" stroke-dasharray="3,3" opacity="0.5"/>
+  <polygon points="305,510 299,507 299,513" fill="#a1a1aa" opacity="0.5"/>
+  <text x="315" y="514" fill="#71717a" font-family="system-ui, sans-serif" font-size="10">LLM fallback / agent handoff</text>
 </svg>

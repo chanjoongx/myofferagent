@@ -35,7 +35,7 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myoffe
 <br />
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/f5f56d96-1bd5-45c2-8210-9de2dd1a2395" alt="My Offer Agent — Home" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/home.png" alt="My Offer Agent — Home" width="960" />
 </div>
 
 <br />
@@ -49,7 +49,7 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 <br />
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/4cda15da-b8a6-4aa9-a318-588c62826550" alt="My Offer Agent — Chat Interface" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_interface.png" alt="My Offer Agent — Chat Interface" width="960" />
 </div>
 
 <br />
@@ -59,7 +59,7 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 ### 💬 Smart Conversation & Agent Handoff
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/7ca3a988-5f33-43eb-83de-43c5c99876d4" alt="Chat Demo — Greeting, capabilities, and automatic agent handoff" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_demo.png" alt="Chat Demo — Greeting, capabilities, and automatic agent handoff" width="960" />
 </div>
 
 > The Triage agent greets users, explains available features, and automatically hands off to the right specialist — like Job Scout — when it detects intent.
@@ -69,7 +69,7 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 ### 📄 ATS Resume Analysis
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/cace0ec4-509c-4f75-a96c-2edbc35984af" alt="Resume Demo — Upload, ATS scoring, and detailed feedback" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/resume_demo.png" alt="Resume Demo — Upload, ATS scoring, and detailed feedback" width="960" />
 </div>
 
 > Upload a PDF resume and get a 100-point ATS compatibility score with section-by-section breakdown and actionable improvement suggestions.
@@ -79,7 +79,7 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 ### 🔍 Job Search & Match Strategy
 
 <div align="center">
-<img src="https://github.com/user-attachments/assets/b82cfd4f-1abd-4c92-a5c5-de9d259f5d71" alt="Job Demo — Real-time search and personalized match analysis" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/job_demo_blurred.png" alt="Job Demo — Real-time search and personalized match analysis" width="960" />
 </div>
 
 > Search for jobs in real-time, then get a personalized match analysis comparing your resume against specific job requirements.

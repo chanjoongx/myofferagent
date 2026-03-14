@@ -13,7 +13,7 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myoffe
 
 <br />
 
-🚀 **Solo Project** · 6 AI Agents · Built in 1 Week
+🚀 **Solo Project** · 6 AI Agents
 
 <br />
 

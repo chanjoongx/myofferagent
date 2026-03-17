@@ -43,6 +43,15 @@ export const metadata: Metadata = {
       "AI-powered career agent — resume building, ATS analysis, job matching, and cover letter generation.",
     type: "website",
     siteName: "My Offer Agent",
+    url: "https://myofferagent.com",
+    images: [
+      {
+        url: "/opengraph-image",
+        width: 1200,
+        height: 630,
+        alt: "My Offer Agent — AI-Powered Career Assistant",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",

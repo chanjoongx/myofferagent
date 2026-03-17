@@ -4,6 +4,10 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
+        userAgent: "LinkedInBot",
+        allow: ["/"],
+      },
+      {
         userAgent: "*",
         disallow: ["/"],
       },

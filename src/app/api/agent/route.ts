@@ -45,6 +45,14 @@ const MAX_MESSAGES = 50;
 const MAX_BODY_SIZE = 1_000_000;
 const MAX_TURNS = 20;
 
+/* ── 웹 검색 회로 차단기 ──
+ * Job Scout의 "검색 3회 제한"은 프롬프트로만 강제되고, 호스티드 웹 검색은
+ * 유료입니다. 프롬프트가 무시되면 maxTurns까지 검색을 반복할 수 있어
+ * (이론상 요청당 십수 회 × 분당 20요청) 청구서가 그대로 커집니다.
+ * 정상 흐름은 3회 이하이므로, 5회를 넘는 순간 프롬프트 이탈로 보고
+ * 실행을 중단합니다. 이력서 변경분은 catch 경로가 그대로 돌려보냅니다. */
+const MAX_WEB_SEARCHES_PER_REQUEST = 5;
+
 /* ── 입력 길이 상한 ──
  * 컨텍스트 폭주와 비용 증폭을 막습니다. Job Scout은 한 턴에 유료 웹 검색을
  * 여러 번 호출하므로, 거대한 입력 × 많은 턴 × 분당 20회는 실제 비용 위험입니다. */
@@ -236,6 +244,7 @@ export async function POST(req: Request): Promise<Response> {
 
         let activeAgent: string = startAgent.name;
         let text = '';
+        let webSearches = 0;
 
         /* 실제로 **의미 있는 작업을 수행한** 에이전트만 기록합니다.
          * 사이드바의 완료 체크가 예전에는 "다른 에이전트로 넘어갔다"는 이유만으로
@@ -261,7 +270,17 @@ export async function POST(req: Request): Promise<Response> {
               case 'run_item_stream_event': {
                 if (event.name === 'tool_called') {
                   const rawItem = event.item.rawItem as { name?: string };
-                  send({ type: 'tool_start', tool: rawItem?.name ?? 'tool' });
+                  const toolName = rawItem?.name ?? 'tool';
+                  send({ type: 'tool_start', tool: toolName });
+                  if (toolName.includes('search')) {
+                    webSearches++;
+                    if (webSearches > MAX_WEB_SEARCHES_PER_REQUEST) {
+                      console.warn(
+                        `[POST /api/agent] 웹 검색 ${webSearches}회 — 상한 초과로 실행을 중단합니다`,
+                      );
+                      abort.abort();
+                    }
+                  }
                 } else if (event.name === 'tool_output') {
                   const rawItem = event.item.rawItem as { name?: string };
                   const toolName = rawItem?.name ?? 'tool';

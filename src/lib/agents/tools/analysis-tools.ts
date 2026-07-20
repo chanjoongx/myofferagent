@@ -186,6 +186,20 @@ const LlmScoreSchema = z.object({
   }),
 });
 
+/* ── 왜 별도의 격리된 LLM 호출인가 (구조를 바꾸기 전에 읽을 것) ──
+ * 에이전트 본체가 키워드·문법까지 채점하게 하면 왕복 한 번(수백 ms)이 줄지만,
+ * 이력서 본문이 **에이전트 대화 컨텍스트 안에서** 채점 지시와 섞입니다.
+ * 지금 구조에서는 이력서가 이 도구의 하위 호출에만 들어가므로, 주입에
+ * 성공해도 영향 범위가 LLM 담당 35점(키워드·문법)으로 격리됩니다 —
+ * 에이전트의 도구 사용이나 대화 흐름은 오염되지 않습니다.
+ * 그 격리가 지연 수백 ms보다 가치 있다고 판단해 현행을 유지합니다. */
+
+/** analyze_ats가 하위 LLM 호출에 넘기는 이력서 평문의 상한.
+ *  이력서 원문 상한(route.ts의 MAX_RESUME_TEXT)과 같은 60k로 맞춥니다.
+ *  클라이언트가 보내는 resumeDoc은 필드별 상한만 받으므로, 악의적으로 모든
+ *  필드를 꽉 채우면 평문이 40만 자를 넘을 수 있습니다 — 여기서 자릅니다. */
+const MAX_ATS_SCAN_CHARS = 60_000;
+
 export const analyzeAts = tool({
   name: 'analyze_ats',
   description:
@@ -228,7 +242,10 @@ Return JSON:
 { "keywordOptimization": { "score": number, "matched": [], "missing": [] },
   "grammar": { "score": number, "errors": [] } }`;
 
-    const payload = `<<<RESUME_START>>>\n${toPlainText(doc)}\n<<<RESUME_END>>>`;
+    /* import_resume_text와 동일하게 fence()로 감쌉니다. 직접 이어 붙이면
+     * resumeDoc의 불릿에 닫는 마커를 넣는 것만으로 울타리를 빠져나갑니다 —
+     * 정확히 sanitize.ts가 문서화한 결함 클래스입니다. */
+    const payload = fence('RESUME', toPlainText(doc), { maxLength: MAX_ATS_SCAN_CHARS });
 
     const llm = await callJson(LlmScoreSchema, system, payload, {
       model: MODEL_CONFIG.standard,

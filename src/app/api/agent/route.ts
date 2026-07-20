@@ -55,17 +55,41 @@ const MAX_TURNS = 20;
  * 이벤트가 도착한 시점에 이미 실행된 뒤라, 한 응답 내 버스트는 어차피 중단으로
  * 막을 수 없습니다. 이 차단기의 실제 역할은 **턴을 넘나드는 검색 루프**를
  * 끊는 것이므로, 관측된 버스트(6)보다 높고 폭주(십수 회)보다 훨씬 낮은 8로
- * 둡니다. 이력서 변경분은 catch 경로가 그대로 돌려보냅니다. */
+ * 둡니다.
+ *
+ * ⚠️ abort()는 catch가 아니라 **done 경로**로 갑니다. SDK는 중단 시 스트림을
+ * 정상 종료하고 `completed`를 resolve하므로, for-await가 끝나고 done 페이로드가
+ * 나갑니다(이력서 변경분·수집된 카드 포함). 대신 잘린 응답임을 사용자가 알도록
+ * done 직전에 안내 문구를 덧붙입니다. */
 const MAX_WEB_SEARCHES_PER_REQUEST = 8;
+
+/* ── 요청 벽시계 상한 ──
+ * 개별 도구 호출에는 45초 타임아웃이 있지만, 에이전트 루프 전체에는 상한이
+ * 없어 업스트림 스트림이 조용히 멈추면 Worker와 SSE가 한없이 매달릴 수
+ * 있습니다. 정상 실행은 1분 안쪽이라, 여유 있는 5분을 넘기면 멈춘 것으로
+ * 보고 중단합니다(정상 실행은 절대 여기 닿지 않습니다). */
+const REQUEST_DEADLINE_MS = 300_000;
 
 /* ── 입력 길이 상한 ──
  * 컨텍스트 폭주와 비용 증폭을 막습니다. Job Scout은 한 턴에 유료 웹 검색을
  * 여러 번 호출하므로, 거대한 입력 × 많은 턴 × 분당 20회는 실제 비용 위험입니다. */
 const MAX_RESUME_TEXT = 60_000;
 const MAX_MESSAGE_CHARS = 12_000;
+/* 메시지 **합계** 상한. 개별(12k)·개수(50) 상한만으로는 50×12k = 60만 자가
+ * 한 요청에 실려 매 턴 재청구됩니다. 합계 상한이 없으면 그게 유일하게 열린
+ * 비용 문. 넉넉히 잡아 정상 대화에는 영향이 없지만 최악값을 잘라냅니다. */
+const MAX_TOTAL_MESSAGE_CHARS = 48_000;
 
 /** 호출해도 "작업을 완료했다"고 볼 수 없는 조회 전용 도구 */
 const READ_ONLY_TOOLS = new Set(['get_resume']);
+
+/** 길이 절삭 시 잘린 서로게이트 쌍(이모지 반쪽)을 남기지 않는다.
+ *  slice는 끝에서만 자르므로 짝 잃은 상위 서로게이트만 생길 수 있고, 그 홀로
+ *  남은 서로게이트를 OpenAI가 400으로 거부해 전체 실행이 실패합니다. */
+function clampText(s: string, max: number): string {
+  const cut = s.length > max ? s.slice(0, max) : s;
+  return /[\uD800-\uDBFF]$/.test(cut) ? cut.slice(0, -1) : cut;
+}
 
 /* ────────────────────────────────────────────
    SSE 헬퍼
@@ -110,7 +134,13 @@ export async function POST(req: Request): Promise<Response> {
     /* ── 본문 크기 ──
      * content-length 헤더만 믿으면 안 됩니다. Transfer-Encoding: chunked면
      * 헤더가 아예 없어서 `Number(null ?? 0)` → 0 → 검사를 그냥 통과합니다.
-     * 실제로 읽은 바이트 수로 판정합니다. */
+     * 그래서 실제로 읽은 바이트 수로 최종 판정하되, content-length가 **있고**
+     * 이미 상한을 넘으면 본문을 통째로 버퍼링하기 전에 빠르게 거절합니다
+     * (거대한 POST가 isolate 메모리를 먼저 잡아먹는 것을 막습니다). */
+    const declaredLength = Number(req.headers.get('content-length'));
+    if (Number.isFinite(declaredLength) && declaredLength > MAX_BODY_SIZE) {
+      return errorResponse('Request body too large', 413);
+    }
     const raw = await req.arrayBuffer();
     if (raw.byteLength > MAX_BODY_SIZE) {
       return errorResponse('Request body too large', 413);
@@ -129,7 +159,7 @@ export async function POST(req: Request): Promise<Response> {
     if (!Array.isArray(body.messages)) {
       return errorResponse('messages must be an array', 400);
     }
-    const messages = body.messages
+    const clampedMessages = body.messages
       .filter(
         (m): m is { role: 'user' | 'assistant'; content: string } =>
           !!m && typeof m === 'object' && typeof m.content === 'string',
@@ -137,14 +167,24 @@ export async function POST(req: Request): Promise<Response> {
       .slice(-MAX_MESSAGES)
       .map((m) => ({
         role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
-        content: m.content.slice(0, MAX_MESSAGE_CHARS),
+        content: clampText(m.content, MAX_MESSAGE_CHARS),
       }));
+
+    /* 합계 상한: 가장 오래된 메시지부터 버려 총량을 맞춥니다 (마지막 메시지는 항상
+     * 유지). 개별·개수 상한만으로는 50×12k = 60만 자가 매 턴 재청구됩니다. */
+    let totalChars = clampedMessages.reduce((n, m) => n + m.content.length, 0);
+    let dropFrom = 0;
+    while (totalChars > MAX_TOTAL_MESSAGE_CHARS && dropFrom < clampedMessages.length - 1) {
+      totalChars -= clampedMessages[dropFrom].content.length;
+      dropFrom++;
+    }
+    const messages = dropFrom > 0 ? clampedMessages.slice(dropFrom) : clampedMessages;
 
     language = body.language && VALID_LANGUAGES.has(body.language) ? body.language : 'ko';
 
     const resumeText =
       typeof body.resumeText === 'string' && body.resumeText.trim().length >= MIN_RESUME_LENGTH
-        ? body.resumeText.trim().slice(0, MAX_RESUME_TEXT)
+        ? clampText(body.resumeText.trim(), MAX_RESUME_TEXT)
         : null;
 
     /* ── 실행 컨텍스트 ──
@@ -189,11 +229,16 @@ export async function POST(req: Request): Promise<Response> {
 
     if (resumeText) {
       // 데이터 안의 울타리 마커를 제거한 뒤 감쌉니다 (sanitize.fence 참고).
+      const fenced = fence('RESUME_TEXT', resumeText, { maxLength: MAX_RESUME_TEXT });
       const last = turnMessages[turnMessages.length - 1];
-      turnMessages[turnMessages.length - 1] = {
-        ...last,
-        content: `${last.content}\n\n${fence('RESUME_TEXT', resumeText, { maxLength: MAX_RESUME_TEXT })}`,
-      };
+      /* 반드시 **user** 턴에 붙입니다. 마지막이 assistant면(클라이언트가 순서를
+       * 조작한 경우) 이력서를 어시스턴트 자신의 발화로 심는 셈이라 신뢰 등급이
+       * 올라갑니다. 그럴 땐 새 user 턴으로 감쌉니다. */
+      if (last.role === 'user') {
+        turnMessages[turnMessages.length - 1] = { ...last, content: `${last.content}\n\n${fenced}` };
+      } else {
+        turnMessages.push({ role: 'user' as const, content: fenced });
+      }
     }
 
     // SDK가 요구하는 아이템 형태로 변환 (assistant는 status와 타입이 붙은 content 필요)
@@ -207,8 +252,11 @@ export async function POST(req: Request): Promise<Response> {
         : { role: 'user' as const, content: m.content },
     );
 
+    // sessionId는 클라이언트가 자유롭게 정하는 유일한 무검증 필드입니다. 줄바꿈을
+    // 걷어내고 길이를 잘라 로그 위조·플러딩을 막습니다 (Workers Logs 활성 상태).
+    const safeSession = String(body.sessionId ?? '').replace(/[\r\n]+/g, ' ').slice(0, 64);
     console.log(
-      `[POST /api/agent] session=${body.sessionId} agent=${startAgent.name} ` +
+      `[POST /api/agent] session=${safeSession} agent=${startAgent.name} ` +
         `chained=${!!body.lastResponseId} items=${inputItems.length} locale=${language}`,
     );
 
@@ -250,6 +298,23 @@ export async function POST(req: Request): Promise<Response> {
         let activeAgent: string = startAgent.name;
         let text = '';
         let webSearches = 0;
+        /* 강제 중단(검색 상한·벽시계) 시 done에 덧붙일 안내. null이면 정상 완료. */
+        let terminationNotice: string | null = null;
+        const NOTICE = {
+          search:
+            language === 'en'
+              ? '\n\n_(Stopped early: the search limit for one request was reached.)_'
+              : '\n\n_(검색 횟수 상한에 도달해 여기서 멈췄습니다.)_',
+          timeout:
+            language === 'en'
+              ? '\n\n_(Stopped early: this request took too long.)_'
+              : '\n\n_(응답이 너무 오래 걸려 여기서 멈췄습니다.)_',
+        };
+        const deadline = setTimeout(() => {
+          terminationNotice ??= NOTICE.timeout;
+          console.warn('[POST /api/agent] 벽시계 상한 초과 — 실행을 중단합니다');
+          abort.abort();
+        }, REQUEST_DEADLINE_MS);
 
         /* 실제로 **의미 있는 작업을 수행한** 에이전트만 기록합니다.
          * 사이드바의 완료 체크가 예전에는 "다른 에이전트로 넘어갔다"는 이유만으로
@@ -283,6 +348,7 @@ export async function POST(req: Request): Promise<Response> {
                       console.warn(
                         `[POST /api/agent] 웹 검색 ${webSearches}회 — 상한 초과로 실행을 중단합니다`,
                       );
+                      terminationNotice ??= NOTICE.search;
                       abort.abort();
                     }
                   }
@@ -320,10 +386,14 @@ export async function POST(req: Request): Promise<Response> {
                 ? ''
                 : JSON.stringify(streamed.finalOutput));
 
+          // 강제 중단이면 잘린 응답임을 사용자에게 알립니다 (안 그러면 문장이
+          // 중간에 끊긴 채 정상 완료처럼 보입니다).
+          const outputWithNotice = terminationNotice ? finalOutput + terminationNotice : finalOutput;
+
           send({
             type: 'done',
             payload: {
-              output: finalOutput,
+              output: outputWithNotice,
               activeAgent: streamed.currentAgent?.name ?? activeAgent,
               completedAgents: [...workedAgents],
               structuredData: collectStructured(),
@@ -369,6 +439,7 @@ export async function POST(req: Request): Promise<Response> {
                 : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.',
           });
         } finally {
+          clearTimeout(deadline);
           if (!closed) {
             closed = true;
             try {

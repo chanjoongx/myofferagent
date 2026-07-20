@@ -16,7 +16,7 @@ vi.mock('../openai-client', () => ({
   })),
 }));
 
-import { analyzeAts } from './analysis-tools';
+import { analyzeAts, reportMatch } from './analysis-tools';
 import { callJson } from '../openai-client';
 import { createContext, type AppContext } from '../context';
 import { coerceResume } from '@/lib/resume/schema';
@@ -95,5 +95,76 @@ describe('analyze_ats 프롬프트 울타리', () => {
     // inlineValue가 줄바꿈을 공백으로 접고 마커를 무력화합니다.
     expect(firstLine).toContain('SWE');
     expect(system).not.toContain('<<<X_START>>>');
+  });
+});
+
+/* report_match의 날조 수치 가드 (2026-07-21 감사에서 추가)
+ * resumeEdits[].suggested는 사용자가 이력서에 그대로 붙여넣는 문장인데,
+ * 이 경로만 improve_bullets와 달리 코드 검증이 없었습니다. */
+describe('report_match 날조 수치 차단', () => {
+  it('이력서에 없는 수치가 든 suggested는 원본으로 되돌린다', async () => {
+    const ctx = createContext({
+      resume: coerceResume({
+        basics: { name: 'Kim' },
+        experience: [{ company: 'Acme', title: 'Intern', bullets: ['Built the backend API'] }],
+      }),
+    });
+
+    await reportMatch.invoke(
+      runContextFor(ctx),
+      JSON.stringify({
+        matchScore: 70,
+        keywordGap: { matched: [], missing: [] },
+        skillMatch: {
+          required: { met: [], unmet: [], percentage: 0 },
+          preferred: { met: [], unmet: [], percentage: 0 },
+        },
+        resumeEdits: [
+          {
+            section: 'Experience',
+            original: 'Built the backend API',
+            // 원본·이력서 어디에도 없는 수치
+            suggested: 'Reduced API latency 45% using Kafka for 12000 users',
+            reason: 'quantify impact',
+          },
+        ],
+      }),
+    );
+
+    const edit = ctx.emitted.match?.resumeEdits?.[0];
+    expect(edit?.suggested).toBe('Built the backend API'); // 원본 유지
+    expect(edit?.reason).toMatch(/원본 유지|kept original/);
+  });
+
+  it('이력서에 있는 수치를 재사용한 suggested는 통과시킨다', async () => {
+    const ctx = createContext({
+      resume: coerceResume({
+        basics: { name: 'Kim' },
+        experience: [{ company: 'Acme', title: 'Intern', bullets: ['Cut response time by 40%'] }],
+      }),
+    });
+
+    await reportMatch.invoke(
+      runContextFor(ctx),
+      JSON.stringify({
+        matchScore: 70,
+        keywordGap: { matched: [], missing: [] },
+        skillMatch: {
+          required: { met: [], unmet: [], percentage: 0 },
+          preferred: { met: [], unmet: [], percentage: 0 },
+        },
+        resumeEdits: [
+          {
+            section: 'Experience',
+            original: 'Cut response time by 40%',
+            suggested: 'Reduced response time 40% by adding Redis caching',
+            reason: 'stronger verb',
+          },
+        ],
+      }),
+    );
+
+    const edit = ctx.emitted.match?.resumeEdits?.[0];
+    expect(edit?.suggested).toBe('Reduced response time 40% by adding Redis caching');
   });
 });

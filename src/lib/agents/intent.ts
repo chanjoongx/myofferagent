@@ -23,7 +23,13 @@ const PATTERNS: Array<{ intent: Intent; re: RegExp }> = [
     // 영어 "find/search ... job|internship|position"은 사이에 수식어가 여러 개
     // 올 수 있습니다 ("find me a software engineering internship").
     // 최대 3단어까지 허용하되, 그 이상은 다른 이야기일 가능성이 커서 끊습니다.
-    re: /채용\s*공고|공고\s*(검색|찾)|구직|일자리|채용\s*중|인턴십?\s*(찾|검색|자리)|(job|internship|position|role)s?\s*(search|hunt|opening)|(search\s+for|find|looking\s+for)\s+(me\s+)?(a\s+|an\s+|some\s+)?(\w+[\s-]+){0,3}(jobs?|internships?|positions?|roles?)\b|who'?s\s+hiring|hiring\s+(right\s+)?now/i,
+    //
+    // ⚠️ 느슨한 "find/looking for … <명사>" 갈래에서 단수 "role"은 뺐습니다.
+    // "looking for a role model", "find a role for this component" 같은 문장이
+    // 유료 웹 검색으로 오라우팅됐습니다. 복수 "roles"("looking for roles")는
+    // 구직 의도가 분명하므로 유지합니다. 미탐은 Triage 한 홉이면 되지만
+    // 오탐은 곧바로 과금이라(routing.ts의 비대칭), 이 갈래는 좁게 둡니다.
+    re: /채용\s*공고|공고\s*(검색|찾)|구직|일자리|채용\s*중|인턴십?\s*(찾|검색|자리)|(job|internship|position|role)s?\s*(search|hunt|opening)|(search\s+for|find|looking\s+for)\s+(me\s+)?(a\s+|an\s+|some\s+)?(\w+[\s-]+){0,3}(jobs?|internships?|positions?|roles)\b|who'?s\s+hiring|hiring\s+(right\s+)?now/i,
   },
   {
     intent: 'analyze',

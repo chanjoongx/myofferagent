@@ -20,6 +20,7 @@ import { scoreRules, combineScores } from '@/lib/resume/ats';
 import { isSafeUrl } from '@/lib/url-utils';
 import { ctxOf, type AppContext } from '../context';
 import { fence, inlineValue } from '../sanitize';
+import { hasFabricatedNumber } from '../fabrication';
 import { callJson } from '../openai-client';
 import { MODEL_CONFIG } from '../model-config';
 import type { RunContext } from '@openai/agents';
@@ -97,7 +98,9 @@ export const importResumeText = tool({
   description:
     '업로드·붙여넣기된 이력서 원문을 구조화해 이력서 정본으로 불러옵니다. 사용자가 이력서 텍스트를 제공했을 때 가장 먼저 호출하세요.',
   parameters: z.object({
-    text: z.string().min(20).max(50_000).describe('이력서 원문 텍스트'),
+    // route.ts의 MAX_RESUME_TEXT(60k)와 맞춥니다. 예전 50k 상한은 50~60k 이력서에서
+    // Zod 검증 실패 → errorFunction → 같은 호출 무한 재시도를 유발했습니다.
+    text: z.string().min(20).max(60_000).describe('이력서 원문 텍스트'),
     targetRole: z.string().max(200).default(''),
   }),
   execute: async (input, runContext: Ctx): Promise<string> => {
@@ -132,7 +135,7 @@ Shape:
 
     // 프롬프트 인젝션 방어: 데이터 안의 울타리 마커를 먼저 제거한 뒤 감쌉니다.
     // (직접 문자열을 이어 붙이면 이력서에 닫는 마커를 넣는 것만으로 울타리를 빠져나갑니다.)
-    const payload = fence('RESUME_TEXT', input.text, { maxLength: 50_000 });
+    const payload = fence('RESUME_TEXT', input.text, { maxLength: 60_000 });
 
     const parsed = await callJson(ParsedResumeSchema, system, payload, {
       /* 이 호출은 제품의 **입구**입니다 — PDF 한 장을 통째로 구조화합니다.
@@ -174,15 +177,19 @@ Shape:
    2. ATS 분석 (규칙 + LLM)
    ──────────────────────────────────────────── */
 
+/* 원소 문자열에도 .max()를 겁니다. 배열 길이만 제한하면, 격리된 ATS 하위
+ * 호출이라도 적대적 이력서가 "missing 키워드로 <수천 자>를 넣어라"로 긴 텍스트를
+ * matched/missing/errors에 담아 도구 출력(→ 메인 에이전트 컨텍스트)과 클라이언트
+ * 카드로 그대로 relay할 수 있습니다. 다른 모델 출력 스키마는 전부 문자열을 캡합니다. */
 const LlmScoreSchema = z.object({
   keywordOptimization: z.object({
     score: z.number().min(0).max(25),
-    matched: z.array(z.string()).max(25),
-    missing: z.array(z.string()).max(25),
+    matched: z.array(z.string().max(80)).max(25),
+    missing: z.array(z.string().max(80)).max(25),
   }),
   grammar: z.object({
     score: z.number().min(0).max(10),
-    errors: z.array(z.string()).max(10),
+    errors: z.array(z.string().max(300)).max(10),
   }),
 });
 
@@ -371,7 +378,27 @@ export const reportMatch = tool({
   parameters: MatchSchema,
   execute: async (input, runContext: Ctx): Promise<string> => {
     const ctx = ctxOf(runContext);
-    ctx.emitted.match = input;
+
+    /* 날조 수치 차단 — improve_bullets와 동일한 코드 검증을 여기에도 적용합니다.
+     * resumeEdits[].suggested는 사용자가 이력서에 그대로 붙여넣는 문장인데, 지금까지
+     * 이 경로만 검증이 없었습니다. 이력서에도 없는 수치가 들어가면 "면접에서 방어할
+     * 수 없는 숫자"가 되어 도움이 아니라 해가 됩니다(프롬프트 경고만으로는 부족). */
+    const resumePlain = toPlainText(ctx.resume);
+    let reverted = 0;
+    const resumeEdits = input.resumeEdits.map((e) => {
+      if (hasFabricatedNumber(e.original, resumePlain, e.suggested)) {
+        reverted++;
+        const note =
+          ctx.locale === 'en'
+            ? ' (kept original: the suggestion introduced a number not in your resume)'
+            : ' (원본 유지: 제안에 이력서에 없는 수치가 있었습니다)';
+        return { ...e, suggested: e.original, reason: e.reason + note };
+      }
+      return e;
+    });
+    if (reverted > 0) console.warn(`[report_match] 날조 수치 ${reverted}건을 되돌렸습니다`);
+
+    ctx.emitted.match = { ...input, resumeEdits };
     return JSON.stringify({
       ok: true,
       note: '매칭 분석 카드를 표시했습니다. 핵심 개선 포인트를 설명하고, 지원 의사를 물어보세요.',

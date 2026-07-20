@@ -30,6 +30,9 @@ describe('detectIntent — 이력서 분석', () => {
     'ATS 점수 알려줘',
     'can you review my resume',
     'analyze my resume please',
+    // 한영 혼용 — 영어 명사에 한국어 동사가 붙는 흔한 형태
+    'resume 분석해줘',
+    'ATS 체크해줘',
   ])('감지: %s', (msg) => {
     expect(detectIntent(msg)).toBe('analyze');
   });
@@ -86,5 +89,21 @@ describe('detectIntent — 경계', () => {
 
   it('이력서 언급만으로 작성 의도로 오인하지 않는다', () => {
     expect(detectIntent('이력서에 뭐라고 적을지 고민이야')).toBeNull();
+  });
+
+  /* 검색 패턴은 의도적으로 확장하지 않습니다. 오탐이 Job Scout으로 가면
+   * 유료 웹 검색이 돌지만, 미탐은 Triage가 한 홉 더 거칠 뿐입니다.
+   * 아래는 그 트레이드오프를 고정하는 테스트입니다 — 동사 없는 명사구는
+   * null(Triage행)이 맞습니다. */
+  it.each(['인턴 공고 좀', '신입 채용', '공고'])(
+    '동사 없는 명사구는 Triage로 보낸다: %s',
+    (msg) => {
+      expect(detectIntent(msg)).toBeNull();
+    },
+  );
+
+  it('짧은 후속 답변은 의도 없음 (세션 유지가 라우팅을 담당)', () => {
+    expect(detectIntent('그럼 그걸로 해줘')).toBeNull();
+    expect(detectIntent('응 부탁해')).toBeNull();
   });
 });

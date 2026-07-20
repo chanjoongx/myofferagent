@@ -57,7 +57,7 @@ function NavControls() {
       <button
         onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
         className="flex items-center gap-1.5 rounded-full border border-surface-border bg-surface-elevated/60 px-3 py-1.5 text-xs text-text-secondary backdrop-blur transition-colors hover:border-accent/40 hover:text-text-primary"
-        aria-label={`Switch language to ${locale === "ko" ? "English" : "한국어"}`}
+        aria-label={t("nav.switchLanguage")}
       >
         <Languages className="h-3.5 w-3.5" />
         {locale === "ko" ? "EN" : "KO"}
@@ -81,7 +81,7 @@ export default function Home() {
         <Link
           href="/"
           className="flex items-center gap-2 text-base font-semibold tracking-tight text-text-primary hover:text-accent transition-colors"
-          aria-label="My Offer Agent home"
+          aria-label={t("nav.home")}
         >
           <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface">
             <Zap className="h-3.5 w-3.5" strokeWidth={2.2} />

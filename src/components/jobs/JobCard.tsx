@@ -82,6 +82,18 @@ export default function JobCard({ job, onAnalyze }: JobCardProps) {
         >
           {t(typeInfo.labelKey)}
         </span>
+        {/* 스폰서십 여부 — 서버 도구가 수집하는 값입니다. 이 앱의 주 사용자는
+            미국 취업 자격이 없어서, "불가"는 매칭률보다 먼저 봐야 하는 정보입니다. */}
+        {job.sponsorship === "no-sponsorship" && (
+          <span className="rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-medium text-red-400">
+            {t("job.noSponsorship")}
+          </span>
+        )}
+        {job.sponsorship === "sponsors" && (
+          <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-medium text-emerald-400">
+            {t("job.sponsors")}
+          </span>
+        )}
       </div>
 
       {job.requirements.length > 0 && (

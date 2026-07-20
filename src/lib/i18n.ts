@@ -1,9 +1,12 @@
 export type Locale = 'ko' | 'en';
 
-const dict: Record<Locale, Record<string, string>> = {
+// 테스트에서 ko/en 키 패리티를 검증할 수 있도록 export합니다.
+export const dict: Record<Locale, Record<string, string>> = {
   ko: {
     // ── Nav ──
     'nav.home': 'My Offer Agent',
+    'nav.switchLanguage': '영어로 전환',
+    'nav.workflowSteps': '에이전트 워크플로 단계',
 
     // ── Landing ──
     'landing.badge': 'AI Career Agent',
@@ -60,6 +63,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'job.remote': 'Remote',
     'job.onsite': 'Onsite',
     'job.hybrid': 'Hybrid',
+    'job.noSponsorship': '스폰서십 불가',
+    'job.sponsors': '스폰서십 가능',
 
     // ── ATS Score Card ──
     'ats.title': 'ATS 호환성 점수',
@@ -165,6 +170,8 @@ const dict: Record<Locale, Record<string, string>> = {
 
   en: {
     'nav.home': 'My Offer Agent',
+    'nav.switchLanguage': 'Switch to Korean',
+    'nav.workflowSteps': 'Agent workflow steps',
 
     'landing.badge': 'AI Career Agent',
     'landing.title1': 'My Offer',
@@ -216,6 +223,8 @@ const dict: Record<Locale, Record<string, string>> = {
     'job.remote': 'Remote',
     'job.onsite': 'Onsite',
     'job.hybrid': 'Hybrid',
+    'job.noSponsorship': 'No sponsorship',
+    'job.sponsors': 'Sponsors visa',
 
     'ats.title': 'ATS Compatibility Score',
     'ats.formatCompatibility': 'Format Compatibility',

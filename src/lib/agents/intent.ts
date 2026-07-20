@@ -27,7 +27,9 @@ const PATTERNS: Array<{ intent: Intent; re: RegExp }> = [
   },
   {
     intent: 'analyze',
-    re: /이력서.{0,8}(분석|검토|평가|점수|봐\s*줘|리뷰)|ats.{0,8}(분석|점수|score|check)|(analyz|review|scor|evaluat)\w*\s+(my\s+)?resume|resume.{0,12}(analysis|review|score|feedback)/i,
+    // "resume 분석해줘"처럼 영어 명사 + 한국어 동사 혼용도 여기서 잡습니다.
+    // 검색 패턴과 달리 분석 오탐은 과금되는 동작이 없어 확장 비용이 낮습니다.
+    re: /이력서.{0,8}(분석|검토|평가|점수|봐\s*줘|리뷰)|resume.{0,8}(분석|검토|평가|점수)|ats.{0,8}(분석|점수|체크|score|check)|(analyz|review|scor|evaluat)\w*\s+(my\s+)?resume|resume.{0,12}(analysis|review|score|feedback)/i,
   },
   {
     intent: 'build',

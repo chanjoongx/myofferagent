@@ -215,7 +215,7 @@ export default memo(function AgentStatusPanel({
               <button
                 onClick={() => { setLocale(locale === "ko" ? "en" : "ko"); }}
                 className="flex h-8 items-center justify-center gap-1 rounded-lg border border-surface-border bg-surface-elevated/40 px-2.5 text-[11px] text-text-secondary hover:border-accent/40 hover:text-text-primary transition-colors"
-                aria-label={`Switch to ${locale === "ko" ? "English" : "한국어"}`}
+                aria-label={t("nav.switchLanguage")}
               >
                 <Languages className="h-3 w-3" />
                 <span>{locale === "ko" ? "EN" : "한"}</span>
@@ -252,7 +252,7 @@ export default memo(function AgentStatusPanel({
          ══════════════════════════════════════════ */}
       <nav
         className="hidden md:flex flex-1 flex-col gap-1 px-2 pt-5"
-        aria-label="Agent workflow steps"
+        aria-label={t("nav.workflowSteps")}
       >
         <div className="mb-2 px-3">
           <span className="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-secondary">
@@ -363,7 +363,7 @@ export default memo(function AgentStatusPanel({
         <button
           onClick={() => setLocale(locale === "ko" ? "en" : "ko")}
           className="flex items-center gap-1.5 rounded-lg border border-surface-border bg-surface-elevated/40 px-3 py-1.5 text-[11px] text-text-secondary transition-colors hover:border-accent/40 hover:text-text-primary w-full justify-center"
-          aria-label={`Switch language to ${locale === "ko" ? "English" : "한국어"}`}
+          aria-label={t("nav.switchLanguage")}
         >
           <Languages className="h-3 w-3" />
           {locale === "ko" ? "English" : "한국어"}

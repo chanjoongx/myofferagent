@@ -127,8 +127,8 @@ leaving the chat.
 **Security**
 - Edge rate limiting with Cloudflare's native rate limiting binding (20 requests/min per IP, aggregated globally, not per-isolate)
 - Prompt injection defenses: untrusted text is fenced with marker folding, ATS scoring runs in an isolated model call, and a code-level check rejects rewritten bullets that invent numbers
-- Request caps enforced on real bytes: 1 MB body, 50 messages, 12k chars per message, 60k chars of resume text, 20 agent turns, at most 8 paid web searches per request
-- Strict CSP with no external script or connect origins besides Cloudflare Analytics; markdown images are never rendered (blocks zero-click data exfiltration)
+- Request caps enforced on real bytes: 1 MB body, 50 messages (48k chars in aggregate), 12k per message, 60k of resume text, 20 agent turns, 8 paid web searches, and a 5-minute run deadline
+- Strict CSP with no external script or connect origins besides Cloudflare Analytics, plus HSTS and Cross-Origin-Opener-Policy; markdown images are never rendered (blocks zero-click data exfiltration)
 
 **Interface**
 - Agent sidebar with live pipeline status; completion checks appear only for agents that actually ran tools
@@ -154,7 +154,7 @@ leaving the chat.
 
 ## Verification
 
-`npm run check` runs typecheck, 309 unit tests, and the production build. Because none of
+`npm run check` runs typecheck, 321 unit tests, and the production build. Because none of
 that exercises the real Workers runtime, `scripts/verify/` adds four harnesses that run
 against a real browser and a real workerd:
 

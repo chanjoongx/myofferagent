@@ -105,7 +105,7 @@ Application Writer back to Job Scout). Cycles are fine; `maxTurns: 20` bounds an
 | DOCX | `docx` 9.x | dynamic import, only loaded on DOCX export |
 | Markdown render | `react-markdown` + `remark-gfm` | raw HTML stays escaped, images never rendered |
 | Hosting | Cloudflare Workers | `@opennextjs/cloudflare` 1.20 + wrangler 4 |
-| Tests | vitest (309 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
+| Tests | vitest (321 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
 
 Models (`src/lib/agents/model-config.ts`):
 
@@ -211,12 +211,16 @@ Response: `text/event-stream`. Every frame is `data: <JSON>\n\n` with one of:
 
 | Limit | Value |
 |:------|:------|
-| Body size | 1,000,000 bytes, measured on received bytes (not the content-length header) |
-| Messages | last 50, each capped at 12,000 chars |
-| Resume text | 60,000 chars, minimum 50 to be treated as a resume |
+| Body size | 1,000,000 bytes, measured on received bytes; a declared content-length over the cap fast-fails before buffering |
+| Messages | last 50, each capped at 12,000 chars, **and 48,000 chars in aggregate** (oldest trimmed to fit, last always kept) so a fresh request cannot carry 50x12k into the model |
+| Resume text | 60,000 chars, minimum 50 to be treated as a resume (the `import_resume_text` tool cap matches at 60k) |
 | Agent turns | `maxTurns: 20` |
 | Web searches | 8 per request; exceeding aborts the run (cost circuit breaker; a single model response was measured bursting to 6, and hosted-tool calls inside one response cannot be interrupted anyway, so the breaker targets cross-turn loops) |
+| Run deadline | 5 minutes wall-clock; a stuck run is aborted (only tool fetches had their own 45s timeout before) |
 | Rate | 20 requests / 60s per IP at the edge |
+
+A forced stop (search breaker or deadline) resolves via the normal `done` path and
+appends a short "stopped early" notice to the output so the truncation is not silent.
 
 ---
 
@@ -373,9 +377,10 @@ auto-deploys** through Cloudflare Workers Builds (typically 2-4 minutes).
 double-deploys.
 
 The Workers Builds build command must stay **`npm run cf:build`** (not the raw
-`npx @opennextjs/cloudflare build`): the wrapper stashes `.env.local` during the
-build and then fails the build if any secret-shaped value is baked into the
-generated `next-env.mjs`. That scan is the deploy-time guard against shipping a
+`npx @opennextjs/cloudflare build`): the wrapper stashes **all four env files the
+adapter bakes** (`.env`, `.env.production`, `.env.local`, `.env.production.local`)
+during the build and then fails the build if any secret-shaped value is baked into
+the generated `next-env.mjs`. That scan is the deploy-time guard against shipping a
 key inside the bundle. The build environment holds no secrets (the runtime key
 lives only in the worker's own secret store), and a failed build leaves the
 previous deployment serving, silently; check the Builds dashboard or API when a
@@ -386,10 +391,18 @@ push does not go live.
 - `nodejs_compat` flag, assets binding for static files
 - `RATE_LIMITER` unsafe binding (`ratelimit`, 20 per 60s) consumed by
   `src/lib/rate-limit.ts`
+- `[observability] enabled = true` so `route.ts`'s operational logs (breaker trips,
+  missing report tools, rate-limiter fallback) reach Workers Logs
+- `workers_dev = false` and `preview_urls = false`: the alternate `*.workers.dev`
+  origin and per-version preview URLs would otherwise serve the same worker with the
+  live key, bypassing the custom domain's zone protections. Production is the custom
+  domain only. (`wrangler deploy` then logs "No targets deployed" because the custom
+  domain is dashboard-managed and updates separately; that message is expected.)
 
 Secrets: `npx wrangler secret put OPENAI_API_KEY` (plus optional model overrides).
 The key never reaches any client bundle (`server-only` imports guard every module
-that touches it).
+that touches it), and it must **not** be set as a Workers Builds environment
+variable (the build never calls the model; a build-env secret only widens exposure).
 
 ### workerd polyfill
 
@@ -440,24 +453,40 @@ errors fall through to the fallback.
   3+ angle brackets so a closing marker cannot be forged inside data, in linear time
   (the previous regex was quadratic and 60k input burned 8s of Worker CPU)
 - `analyze_ats` scores in an isolated sub-call, bounding a successful injection to the
-  35 model-judged points (regression-tested in `analysis-tools.test.ts`)
+  35 model-judged points (regression-tested in `analysis-tools.test.ts`); its output
+  schema and `import_resume_text`/`improve_bullets` all cap element string lengths so a
+  hostile resume cannot relay unbounded text back across the isolation boundary
 - Instructions carry an explicit data-handling guard; imperative boilerplate like
   "ignore previous instructions" is visibly neutralized inside fenced data
-- `improve_bullets` rejects invented numbers in code, not by trusting the prompt
+- `improve_bullets` **and** `report_match` reject invented numbers in code (the same
+  fabrication check), so a fabricated metric cannot reach a paste-ready suggestion
 
 ### Output safety
 
 - Print HTML escapes every value and drops non-http(s)/mailto hrefs; the print iframe
   runs sandboxed without `allow-scripts`
 - Chat markdown never renders images and validates link URLs
+
+### Response headers (`next.config.ts`, applied to every worker-served route)
+
 - CSP: `default-src 'self'`; scripts/styles self + inline (Next bootstrap); images
   self/data/blob only; connect limited to self + Cloudflare Analytics;
-  `frame-ancestors 'none'`
+  `frame-ancestors 'none'`; `object-src 'none'`; `base-uri`/`form-action 'self'`
+- `Strict-Transport-Security: max-age=63072000; includeSubDomains` (Cloudflare does
+  not add HSTS to a custom domain by default; without it a first-visit http:// request
+  is downgradeable, and this app takes resume PII)
+- `Cross-Origin-Opener-Policy: same-origin`, `X-Frame-Options: DENY`,
+  `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+  `Permissions-Policy` denying camera/mic/geo/FLoC/topics
+- Known gap: static assets (`/_next/static/*`, images, manifest) are served by the
+  assets binding before the worker, so they do **not** get these headers. Low risk
+  (all repo-authored); a `public/_headers` file or a CF Transform Rule would close it.
 
 ### Cost controls
 
 - Paid web search: prompt-limited to 3, hard-aborted at 8 per request
-- `maxTurns: 20`, all size caps above, and per-IP rate limiting bound the worst case
+- Aggregate 48k message-char budget + per-message/count caps + 60k resume cap
+- `maxTurns: 20`, a 5-minute run deadline, and per-IP rate limiting bound the worst case
 - Sub-calls carry the request abort signal, so a user stop actually stops billing
 
 ### Log hygiene
@@ -488,7 +517,7 @@ Baseline as of 2026-07-21:
 
 | Layer | Command | Count |
 |:------|:--------|:------|
-| Types + unit + build | `npm run check` | 309 vitest tests |
+| Types + unit + build | `npm run check` | 321 vitest tests |
 | Real browser vs workerd | `node scripts/verify/browser.mjs <url> scripts/verify` | 16 checks (pdfjs origin, CSP, PDF round-trip, panel edit persistence, multi-tab sync, IME guard) |
 | Accessibility | `node scripts/verify/verify-a11y.mjs <url>` | 21 checks |
 | Sidebar completion truthfulness | `node scripts/verify/verify-checkmarks.mjs <url>` | 7 checks, calls the real model |
@@ -539,6 +568,23 @@ the full production e2e once per release, and iterate on single scenarios
   board integration.
 - The site is intentionally `noindex` (robots disallow all but LinkedInBot) while it
   remains a portfolio deployment; `sitemap.ts` exists for when indexing opens.
+
+### Deferred from the 2026-07-21 audit (verified real, not yet fixed)
+
+- **Static assets get no security headers.** `/_next/static/*`, images, and the
+  manifest are served by the assets binding before the worker, so they miss the CSP /
+  nosniff / HSTS set. Low risk (all repo-authored); close with a `public/_headers`
+  file or a Cloudflare Transform Rule.
+- **The stream error path drops `ctx.emitted` structured data.** If a paid tool
+  (e.g. `analyze_ats`) completes and then the final turn errors, the ATS card is lost
+  with the error; only resume edits are salvaged. Fixing it cleanly needs a new SSE
+  event type, so it was deferred.
+- **Incremental cache is `"dummy"`** (`open-next.config.ts`), so `/` and `/agent`
+  re-render per request instead of serving cached HTML. Benign at current traffic;
+  `staticAssetsIncrementalCache` is the zero-infra fix.
+- **`report_match` chain ownership, `upsertListItem` at the 20-item cap, and
+  duplicate-id list merges** are edge behaviors noted but judged too rare / too
+  policy-dependent to change this pass.
 
 ### Planned improvements (not scheduled)
 

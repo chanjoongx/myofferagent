@@ -26,7 +26,7 @@
 | PDF 파싱 | pdfjs-dist (**로컬 번들** 동적 import) | 5.5.x |
 | DOCX 생성 | docx (클라이언트, 동적 import) | 9.7.x |
 | 아이콘 | lucide-react | - |
-| 테스트 | vitest (순수 로직 + 도구 실행 경로 309개) + 검증 하네스 4종 (`scripts/verify/`) | 3.2.x |
+| 테스트 | vitest (순수 로직 + 도구 실행 경로 321개) + 검증 하네스 4종 (`scripts/verify/`) | 3.2.x |
 | 서버 보호 | server-only (`lib/agents/tools/*`, openai-client, rate-limit) | - |
 | 배포 | Cloudflare Workers (@opennextjs/cloudflare + wrangler, push 시 Workers Builds 자동 배포) | - |
 
@@ -508,7 +508,7 @@ OpenNext는 빌드 시점에 `.env*`를 읽어 `.open-next/cloudflare/next-env.m
 ## 검증 방법
 
 ```bash
-npm run check          # typecheck + vitest 309개 + next build (webpack)
+npm run check          # typecheck + vitest 321개 + next build (webpack)
 npm run verify:local   # cf:preview 대상 4종 하네스 (browser 16 / a11y 21 / checkmarks 7 / e2e 33)
 npm run verify:prod    # 프로덕션 a11y + e2e (실과금, 배포 후 1회)
 npm run check:models   # 설정된 모델이 실제로 호출되는지 확인 (실과금)

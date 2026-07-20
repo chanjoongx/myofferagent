@@ -64,6 +64,13 @@ export function preloadPdfJs(): void {
   });
 }
 
+/* 파일 크기(10MB)만으로는 부족합니다. 희소한 페이지로 채운 PDF는 10MB 안에서도
+ * 수만 페이지가 되어 추출이 몇 분씩 걸리고 수백 MB 문자열을 만들어 탭을 죽입니다.
+ * 이력서는 1~2페이지가 표준이라 넉넉히 30페이지에서 끊고, 텍스트도 상한을 둡니다
+ * (서버는 어차피 60k만 받습니다). */
+const MAX_PDF_PAGES = 30;
+const MAX_PDF_TEXT_CHARS = 120_000;
+
 export async function extractTextFromPDF(file: File): Promise<string> {
   if (typeof window === 'undefined') {
     throw new Error('PDF 파싱은 브라우저 환경에서만 가능합니다');
@@ -72,23 +79,33 @@ export async function extractTextFromPDF(file: File): Promise<string> {
   const pdfjs = await loadPdfJs();
 
   const buf = await file.arrayBuffer();
-  const pdf = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
+  const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
 
-  const pageTexts: string[] = [];
-  for (let i = 1; i <= pdf.numPages; i++) {
-    const page = await pdf.getPage(i);
-    const content = await page.getTextContent();
-    const text = content.items
-      .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
-      .filter(Boolean)
-      .join(' ');
-    pageTexts.push(text);
+  try {
+    const pageTexts: string[] = [];
+    const pageCount = Math.min(doc.numPages, MAX_PDF_PAGES);
+    let total = 0;
+    for (let i = 1; i <= pageCount; i++) {
+      const page = await doc.getPage(i);
+      const content = await page.getTextContent();
+      const text = content.items
+        .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
+        .filter(Boolean)
+        .join(' ');
+      // 워커에 페이지 리소스가 계속 쌓이지 않도록 각 페이지를 정리합니다.
+      page.cleanup();
+      pageTexts.push(text);
+      total += text.length;
+      if (total >= MAX_PDF_TEXT_CHARS) break;
+    }
+
+    const result = pageTexts.join('\n').slice(0, MAX_PDF_TEXT_CHARS).trim();
+    if (!result) {
+      throw new Error('PDF에서 텍스트를 추출할 수 없습니다. 스캔된 이미지 PDF일 수 있습니다.');
+    }
+    return result;
+  } finally {
+    // 문서/워커 메모리를 반드시 반환합니다 — 없으면 첨부할 때마다 누적됩니다.
+    doc.destroy();
   }
-
-  const result = pageTexts.join('\n').trim();
-  if (!result) {
-    throw new Error('PDF에서 텍스트를 추출할 수 없습니다. 스캔된 이미지 PDF일 수 있습니다.');
-  }
-
-  return result;
 }

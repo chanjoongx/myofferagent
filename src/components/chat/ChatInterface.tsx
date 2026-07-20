@@ -287,10 +287,19 @@ export default function ChatInterface() {
 
     let rafId = 0;
     let prevHeight = 0;
+    let prevWidth = vv.width;
     fullHeightRef.current = vv.height;
 
     const syncVh = () => {
       const h = vv.height;
+      const w = vv.width;
+      /* 회전 감지: 너비가 바뀌면 기준 높이를 새 방향의 높이로 재설정합니다.
+       * 안 그러면 세로(800)에서 가로(360)로 돌렸을 때 360 < 800*0.75이라
+       * 키보드가 없는데도 keyboardOpen이 true로 굳어 사이드바가 사라집니다. */
+      if (w !== prevWidth) {
+        prevWidth = w;
+        fullHeightRef.current = h;
+      }
       if (h === prevHeight) return;
       prevHeight = h;
 
@@ -552,8 +561,9 @@ export default function ChatInterface() {
 
             onResume: (doc) => {
               // 오류로 끝나도 이력서 편집분은 살립니다.
+              // 패널을 강제로 열지 않습니다: 데스크톱은 항상 보이고, 모바일에서
+              // 대화 도중 전체 화면 모달을 띄우면 포커스를 뺏고 키보드와 충돌합니다.
               resume.applyServerDoc(sentDoc, doc);
-              setPanelOpen(true);
             },
 
             onDelta: (chunk) => {
@@ -580,8 +590,8 @@ export default function ChatInterface() {
               if (payload.resumeDoc) {
                 // 응답을 기다리는 20~40초 사이에 사용자가 패널에서 고친 내용을
                 // 서버 응답이 덮어쓰지 않도록 3-way 병합합니다.
+                // (패널 자동 열기 없음 — onResume의 주석 참고.)
                 resume.applyServerDoc(sentDoc, payload.resumeDoc);
-                setPanelOpen(true);
               }
 
               updateMessage(assistantId, (m) => ({
@@ -597,7 +607,11 @@ export default function ChatInterface() {
 
             onError: (rawMessage) => {
               const message =
-                rawMessage === 'STREAM_TRUNCATED' ? t('chat.error') : rawMessage;
+                rawMessage === 'PAYLOAD_TOO_LARGE'
+                  ? t('chat.tooLarge')
+                  : rawMessage === 'STREAM_TRUNCATED'
+                    ? t('chat.error')
+                    : rawMessage;
               endStreaming();
               /* 실패한 턴은 응답 체인에 없습니다 (handleStop과 같은 이유).
                * 체인을 비워 다음 턴이 화면의 전체 이력을 보내게 합니다. */
@@ -619,8 +633,13 @@ export default function ChatInterface() {
           { id: nextMessageId(), role: "system", content: t("chat.error"), isError: true },
         ]);
       } finally {
-        setIsLoading(false);
-        setStatusKey(null);
+        /* 이 send의 컨트롤러가 아직 활성일 때만 로딩 상태를 내립니다. 새 send가
+         * 시작되며 이 send를 abort하면, 뒤늦게 도착하는 이 finally가 진행 중인
+         * 새 턴의 로딩 상태(중지 버튼·상태 표시)를 꺼뜨리지 않도록 합니다. */
+        if (abortControllerRef.current === controller) {
+          setIsLoading(false);
+          setStatusKey(null);
+        }
         requestAnimationFrame(() => textareaRef.current?.focus());
       }
     },
@@ -788,7 +807,11 @@ export default function ChatInterface() {
                 />
               )}
 
-              {msg.isError && (
+              {/* 재시도는 **가장 최근** 교환이 실패했을 때만 보여 줍니다. 예전에는 오래된
+                  오류 말풍선의 재시도가 계속 남아, 그 뒤 성공한 대화가 있는 상태에서 누르면
+                  마지막 사용자 메시지까지 잘라내 방금 성공한 답까지 지우고 엉뚱한 메시지를
+                  다시 보냈습니다. handleRetry의 전제(마지막 실패만 재시도)를 UI로 강제합니다. */}
+              {msg.isError && msg.id === messages[messages.length - 1]?.id && (
                 <div className="flex justify-center">
                   <button
                     onClick={handleRetry}

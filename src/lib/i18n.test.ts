@@ -28,4 +28,10 @@ describe('i18n 사전', () => {
   it('없는 키는 키 문자열 자체를 반환한다 (빈 화면 방지)', () => {
     expect(t('en', 'no.such.key')).toBe('no.such.key');
   });
+
+  it('파라미터 값의 $ 패턴이 특수 처리되지 않는다 (함수 치환자)', () => {
+    // 문자열 치환자였다면 `$&`가 매칭 텍스트로 치환돼 "{agent}"가 남았습니다.
+    expect(t('en', 'chat.agentSwitch', { agent: 'A$&B' })).toBe('Switched to A$&B');
+    expect(t('ko', 'chat.agentSwitch', { agent: '$`x' })).toBe('$`x로 전환되었습니다');
+  });
 });

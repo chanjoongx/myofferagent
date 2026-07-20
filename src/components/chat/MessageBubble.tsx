@@ -128,11 +128,16 @@ const mdComponents: Components = {
 
 /* ── Component ─────────────────────────────────────── */
 
-/* ── 시간 포맷 ── */
-function formatTime(ts?: number): string | null {
+/* ── 시간 포맷 ──
+ * 앱에서 고른 언어를 씁니다. `[]`(브라우저 로케일)를 쓰면 한국어 UI 사용자가
+ * en-US 브라우저에서 "3:45 PM" 형식을 보게 됩니다. */
+function formatTime(ts: number | undefined, locale: string): string | null {
   if (!ts) return null;
   const d = new Date(ts);
-  return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  return d.toLocaleTimeString(locale === "ko" ? "ko-KR" : "en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 function MessageBubble({
@@ -143,7 +148,7 @@ function MessageBubble({
   timestamp,
   streaming,
 }: MessageBubbleProps) {
-  const { t } = useLanguage();
+  const { t, locale } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -180,7 +185,7 @@ function MessageBubble({
   }
 
   const isUser = role === "user";
-  const time = formatTime(timestamp);
+  const time = formatTime(timestamp, locale);
 
   // 테이블 포함 메시지는 버블 너비를 확대하여 가독성 향상
   const hasTable = !isUser && content.includes("\n|") && content.includes("---|");

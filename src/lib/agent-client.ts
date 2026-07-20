@@ -64,8 +64,14 @@ export async function streamAgent(
     signal,
   });
 
-  if (!res.body) {
-    handlers.onError?.(`API ${res.status}`);
+  /* 라우트는 자기 오류도 SSE로(비 200 상태) 돌려주므로 그건 계속 파싱합니다.
+   * 하지만 워커 앞단(Cloudflare)이 413/429/5xx를 HTML로 돌려주면 SSE 프레임이
+   * 없어, 끝까지 읽어도 done/error가 없어 STREAM_TRUNCATED로만 보입니다
+   * (413에 "다시 시도"는 틀린 안내). content-type으로 엣지 오류를 구분해
+   * 즉시 알립니다. */
+  const contentType = res.headers.get('content-type') || '';
+  if (!res.body || (!res.ok && !contentType.includes('text/event-stream'))) {
+    handlers.onError?.(res.status === 413 ? 'PAYLOAD_TOO_LARGE' : 'STREAM_TRUNCATED');
     return;
   }
 
@@ -90,12 +96,18 @@ export async function streamAgent(
 
         const line = frame.split('\n').find((l) => l.startsWith('data:'));
         if (line) {
+          let parsed: AgentStreamEvent | null = null;
           try {
-            const parsed = JSON.parse(line.slice(5).trim()) as AgentStreamEvent;
-            if (parsed.type === 'done' || parsed.type === 'error') terminated = true;
-            dispatch(parsed, handlers);
+            parsed = JSON.parse(line.slice(5).trim()) as AgentStreamEvent;
           } catch {
             // 손상된 프레임은 건너뜁니다 — 스트림 전체를 죽이지 않습니다.
+          }
+          if (parsed) {
+            if (parsed.type === 'done' || parsed.type === 'error') terminated = true;
+            /* dispatch는 parse try 밖입니다. 핸들러(onDone 등)가 던지면 손상 프레임처럼
+             * 조용히 삼켜지는 대신 밖으로 전파돼(streamAgent 거부 → 호출자 catch),
+             * 말풍선이 영원히 스트리밍 상태로 멈추는 것을 막습니다. */
+            dispatch(parsed, handlers);
           }
         }
         boundary = buffer.indexOf('\n\n');

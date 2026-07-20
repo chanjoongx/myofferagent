@@ -10,7 +10,7 @@
  * 여기서 고친 내용은 다음 턴에 그대로 에이전트에게 전달됩니다.
  */
 
-import { useState, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Download,
   FileText,
@@ -169,6 +169,31 @@ function BulletEditor({
   );
 }
 
+/**
+ * 쉼표 구분 목록의 로컬 초안 상태.
+ *
+ * EditableText는 완전 제어 컴포넌트라, 정규화한 값(split/trim/filter/join)을 매
+ * 입력마다 되돌려 주면 **방금 친 쉼표·공백이 즉시 지워집니다** — "Java, Python"이나
+ * "Visual Studio"를 한 글자씩 칠 수가 없었습니다. 그래서 표시는 사용자의 원문
+ * 초안으로 하고, 정규화한 배열은 부모에 그때그때 커밋합니다. 외부에서 값이 바뀌면
+ * (에이전트 패치 등) 정규화 결과가 달라진 경우에만 초안을 따라 맞춥니다.
+ */
+function useCsvDraft(values: string[], onChange: (next: string[]) => void) {
+  const canonical = values.join(', ');
+  const [draft, setDraft] = useState(canonical);
+  useEffect(() => {
+    const normalized = draft.split(',').map((s) => s.trim()).filter(Boolean).join(', ');
+    if (normalized !== canonical) setDraft(canonical);
+    // draft는 의도적으로 의존성에서 제외 — 넣으면 편집 중 초안을 매번 덮어씁니다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [canonical]);
+  const onDraftChange = (v: string) => {
+    setDraft(v); // 원문 그대로 표시
+    onChange(v.split(',').map((s) => s.trim()).filter(Boolean));
+  };
+  return { draft, onDraftChange };
+}
+
 /** 쉼표 구분 목록 편집 (스킬용) */
 function CsvField({
   label,
@@ -179,24 +204,40 @@ function CsvField({
   values: string[];
   onChange: (next: string[]) => void;
 }) {
+  const { draft, onDraftChange } = useCsvDraft(values, onChange);
   return (
     <div className="flex gap-2 text-[12px]">
       <span className="w-20 shrink-0 pt-1 text-text-secondary">{label}</span>
       <EditableText
-        value={values.join(', ')}
-        onChange={(v) =>
-          onChange(
-            v
-              .split(',')
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
+        value={draft}
+        onChange={onDraftChange}
         multiline
         ariaLabel={label}
         className="text-[12px] leading-snug"
       />
     </div>
+  );
+}
+
+/** 프로젝트 tech 필드 — CsvField와 같은 초안 로직, 라벨 없이 그리드 칸에 들어갑니다. */
+function TechField({
+  values,
+  onChange,
+  label,
+}: {
+  values: string[];
+  onChange: (next: string[]) => void;
+  label: string;
+}) {
+  const { draft, onDraftChange } = useCsvDraft(values, onChange);
+  return (
+    <EditableText
+      value={draft}
+      onChange={onDraftChange}
+      placeholder={label}
+      ariaLabel={label}
+      className="text-[12px]"
+    />
   );
 }
 
@@ -439,17 +480,10 @@ export default function ResumePanel({
                 className="pr-6 text-[13px] font-semibold"
               />
               <div className="grid grid-cols-2 gap-x-2 text-[12px] text-text-secondary">
-                <EditableText
-                  value={p.tech.join(', ')}
-                  onChange={(v) =>
-                    upsertItem('projects', {
-                      id: p.id,
-                      tech: v.split(',').map((s) => s.trim()).filter(Boolean),
-                    })
-                  }
-                  placeholder={t('resume.field.tech')}
-                  ariaLabel={t('resume.field.tech')}
-                  className="text-[12px]"
+                <TechField
+                  values={p.tech}
+                  onChange={(next) => upsertItem('projects', { id: p.id, tech: next })}
+                  label={t('resume.field.tech')}
                 />
                 <EditableText
                   value={p.url}

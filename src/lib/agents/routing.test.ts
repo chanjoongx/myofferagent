@@ -106,4 +106,18 @@ describe('detectIntent — 경계', () => {
     expect(detectIntent('그럼 그걸로 해줘')).toBeNull();
     expect(detectIntent('응 부탁해')).toBeNull();
   });
+
+  /* 단수 "role"은 느슨한 갈래에서 제외했습니다. 오탐이 Job Scout으로 가면
+   * 유료 웹 검색이 먼저 돌기 때문입니다(2026-07-21 감사). */
+  it.each([
+    'I am looking for a role model in engineering',
+    'find a role for this component in my design',
+    'looking for a role model to mentor me',
+  ])('단수 "role"은 검색으로 오판하지 않는다: %s', (msg) => {
+    expect(detectIntent(msg)).toBeNull();
+  });
+
+  it('복수 "roles"는 구직 의도로 유지된다', () => {
+    expect(detectIntent('looking for roles in the bay area')).toBe('search');
+  });
 });

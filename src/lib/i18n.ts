@@ -48,6 +48,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'chat.messageList': '대화 메시지 목록',
     'chat.retry': '다시 시도',
     'chat.copyMessage': '메시지 복사',
+    'chat.tooLarge': '입력이 너무 깁니다. 내용을 줄이거나 새 대화를 시작해 주세요.',
 
     // ── Sidebar ──
     'sidebar.title': 'Agents',
@@ -210,6 +211,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'chat.messageList': 'Chat messages',
     'chat.retry': 'Retry',
     'chat.copyMessage': 'Copy message',
+    'chat.tooLarge': 'Your input is too long. Please shorten it or start a new conversation.',
 
     'sidebar.title': 'Agents',
     'sidebar.done': 'Done',
@@ -330,7 +332,9 @@ export function t(
   let text = dict[locale]?.[key] ?? dict.ko[key] ?? key;
   if (params) {
     for (const [k, v] of Object.entries(params)) {
-      text = text.replaceAll(`{${k}}`, v);
+      // 함수 치환자 — 문자열 치환자였다면 값 안의 `$&`·`$1` 등이 특수 처리되어
+      // 서버에서 온 파라미터(에이전트 이름 등)가 깨질 수 있습니다.
+      text = text.replaceAll(`{${k}}`, () => v);
     }
   }
   return text;

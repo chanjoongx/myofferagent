@@ -291,7 +291,18 @@ function styles(opts: Required<PrintOptions>): string {
  * iframe `srcdoc`에 넣거나 그대로 파일로 저장할 수 있습니다.
  */
 export function toPrintHtml(doc: ResumeDocument, options: PrintOptions = {}): string {
-  const opts = { ...DEFAULTS, ...options };
+  // opts 값은 <style>/@page에 이스케이프 없이 삽입됩니다. 타입은 런타임에 지워지므로,
+  // 호출자가 사용자 입력을 넘기더라도 CSS가 주입되지 않도록 여기서 검증·절삭합니다.
+  // (현재 유일한 호출자는 옵션을 넘기지 않지만, 이 파일은 "모든 입력을 이스케이프한다"를
+  //  약속하므로 그 계약을 스타일 값에도 지킵니다.)
+  const clampNum = (v: unknown, lo: number, hi: number, fallback: number) =>
+    typeof v === 'number' && Number.isFinite(v) ? Math.min(hi, Math.max(lo, v)) : fallback;
+  const opts: Required<PrintOptions> = {
+    fontFamily: options.fontFamily === 'sans' ? 'sans' : DEFAULTS.fontFamily,
+    paper: options.paper === 'a4' ? 'a4' : DEFAULTS.paper,
+    fontSizePt: clampNum(options.fontSizePt, 8, 16, DEFAULTS.fontSizePt),
+    marginIn: clampNum(options.marginIn, 0, 1.5, DEFAULTS.marginIn),
+  };
 
   const contacts = contactLine(doc.basics)
     .map((c) => (c.url ? anchor(c.label, c.url) : esc(c.label)))

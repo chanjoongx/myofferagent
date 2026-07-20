@@ -26,6 +26,7 @@ import {
   removeListItem,
   completeness,
   threeWayMerge,
+  coerceResume,
   type ResumeDocument,
   type ListSection,
 } from './schema';
@@ -59,7 +60,12 @@ export function useResume() {
    * `base`는 요청을 보낼 때의 문서입니다.
    */
   const applyServerDoc = useCallback((base: ResumeDocument, server: ResumeDocument) => {
-    updateResume((ours) => threeWayMerge(base, ours, server));
+    // 서버 페이로드는 SSE로 온 신뢰할 수 없는 JSON입니다. threeWayMerge는 세 인자가
+    // 모두 온전한 ResumeDocument라고 가정하고 `theirs[section].map`을 호출하므로,
+    // education 등이 배열이 아니면 던집니다. coerce로 형태를 보장해 병합이 절대
+    // 던지지 않게 합니다 (onDone에서 던지면 말풍선이 영원히 스트리밍 상태로 남습니다).
+    const safeServer = coerceResume(server);
+    updateResume((ours) => threeWayMerge(base, ours, safeServer));
   }, []);
 
   return {

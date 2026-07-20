@@ -75,6 +75,12 @@ function attachTabSync(): void {
         return; // 손상된 쓰기는 무시 — 이 탭의 사본을 지킵니다
       }
     }
+    /* 다른 탭의 쓰기를 채택했으니, 우리 탭에 남아 있던 **더 오래된** 대기 저장은
+     * 무효입니다. 취소하지 않으면 그 타이머가 방금 받아들인 값을 옛 값으로
+     * 덮어쓰고 storage 이벤트로 상대 탭까지 되돌려, 상대의 편집이 사라집니다
+     * ("마지막 쓰기 승리" 계약 위반). */
+    clearTimeout(saveTimer);
+    saveTimer = undefined;
     // 방금 storage에서 읽었으므로 다시 저장하지 않습니다 (echo 방지)
     for (const listener of listeners) listener();
   });
@@ -138,6 +144,7 @@ export function updateResume(fn: (prev: ResumeDocument) => ResumeDocument): void
 /** 빈 이력서로 초기화하고 저장본도 삭제 */
 export function resetResume(): void {
   clearTimeout(saveTimer);
+  saveTimer = undefined; // pagehide 플러시가 방금 지운 키를 되살리지 않도록 대기 표시를 지웁니다
   try {
     window.localStorage.removeItem(STORAGE_KEY);
   } catch {

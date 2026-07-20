@@ -445,4 +445,19 @@ describe('control character stripping', () => {
     });
     expect(doc.experience[0].bullets[0]).toContain('<<<RESUME_END>>>');
   });
+
+  it('U+FFFF와 짝 잃은 서로게이트를 제거한다 (docx XML 유효성)', () => {
+    // 손상된 localStorage 값: JSON.parse가 홀로 남은 상위 서로게이트를 통과시킵니다.
+    const doc = coerceResume({
+      basics: { name: 'Kim￿\uD800Chan', summary: 'ok\uDC00end' },
+    });
+    expect(doc.basics.name).toBe('KimChan');
+    expect(doc.basics.summary).toBe('okend');
+  });
+
+  it('유효한 서로게이트 쌍(이모지·상위 평면 문자)은 보존한다', () => {
+    const emoji = String.fromCodePoint(0x1f680); // 🚀
+    const doc = coerceResume({ basics: { name: `Kim ${emoji}` } });
+    expect(doc.basics.name).toBe(`Kim ${emoji}`);
+  });
 });

@@ -49,8 +49,10 @@ export const LIMITS = {
  * 조작할 수 있습니다. 탭과 줄바꿈만 남기고 걷어냅니다. */
 // eslint-disable-next-line no-control-regex
 const CONTROL_CHARS =
-  /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
-const stripControls = (s: string) => s.replace(/\r\n?/g, '\n').replace(CONTROL_CHARS, '');
+  /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF\uFFFE\uFFFF]/g;
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+const stripControls = (s: string) =>
+  s.replace(/\r\n?/g, '\n').replace(CONTROL_CHARS, '').replace(LONE_SURROGATE, '');
 
 /** 문자열 — 항상 성공. 문자열이 아니면 빈 값, 길면 자른다. */
 const text = (max: number) =>

@@ -3,6 +3,14 @@
 
 import type { ResumeDocument } from './resume/schema';
 
+/**
+ * 한 요청에 담는 대화 이력의 상한 (클라이언트·서버 공용).
+ * 서버는 이 개수만 사용하므로, 클라이언트가 그 이상을 보내는 것은
+ * 대역폭 낭비일 뿐 아니라 긴 세션에서 본문 1MB 상한(413)에 걸려
+ * 이후 모든 전송이 실패하는 원인이 됩니다.
+ */
+export const MAX_HISTORY_MESSAGES = 50;
+
 // ---------- API 요청 ----------
 export interface AgentRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
@@ -135,6 +143,12 @@ export interface JobSearchResult {
   url: string;
   requirements: string[];
   estimatedMatch: number;
+  /**
+   * 스폰서십 가능 여부. 서버 도구 스키마(analysis-tools.ts)가 수집합니다.
+   * 이 앱의 주 사용자는 미국 취업 자격이 없는 한국 국적자라,
+   * "no-sponsorship" 공고는 매칭률과 무관하게 지원할 수 없습니다.
+   */
+  sponsorship?: 'sponsors' | 'no-sponsorship' | 'unknown';
 }
 
 // ---------- 파싱된 이력서 ----------

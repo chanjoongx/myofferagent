@@ -22,7 +22,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useResume } from "@/lib/resume/use-resume";
 import { streamAgent } from "@/lib/agent-client";
 import { AGENT_NAMES } from "@/lib/agents/constants";
-import type { StructuredData, MatchAnalysis } from "@/lib/types";
+import { MAX_HISTORY_MESSAGES, type StructuredData, type MatchAnalysis } from "@/lib/types";
 import type { ResumeDocument } from "@/lib/resume/schema";
 
 /* ── 타입 ──────────────────────────────────── */
@@ -324,6 +324,14 @@ export default function ChatInterface() {
   useEffect(() => {
     if (prevLocaleRef.current !== locale) {
       prevLocaleRef.current = locale;
+      /* 진행 중인 스트림을 반드시 끊습니다. 끊지 않으면 이전 대화의 응답이
+       * 리셋 뒤에 도착해 onAgent가 새 대화에 전환 메시지를 끼워 넣고,
+       * onDone이 방금 비운 lastResponseId를 이전 대화의 체인 값으로
+       * 되살립니다 — 새 대화가 이전 언어의 맥락 위에서 이어지게 됩니다. */
+      abortControllerRef.current?.abort();
+      endStreaming();
+      setIsLoading(false);
+      setStatusKey(null);
       sessionIdRef.current = generateSessionId();
       resetAgent();
       setLastResponseId(null);
@@ -340,7 +348,7 @@ export default function ChatInterface() {
         agentName: AGENT_NAMES.TRIAGE,
       },
     ]);
-  }, [locale, t, resetAgent]);
+  }, [locale, t, resetAgent, endStreaming]);
 
   // 자동 스크롤
   useEffect(() => {
@@ -429,9 +437,23 @@ export default function ChatInterface() {
     abortControllerRef.current?.abort();
     setIsLoading(false);
     setStatusKey(null);
+    /* 중단된 턴은 OpenAI 측 응답 체인에 기록되지 않습니다. 체인을 그대로 두면
+     * 다음 턴은 마지막 사용자 메시지 하나만 서버로 보내고, 방금 중단된 질문과
+     * 부분 응답은 화면에는 보이는데 모델의 기억에는 없는 상태가 됩니다
+     * ("아까 그거 이어서 해줘"가 통하지 않음). 체인을 비우면 다음 턴이
+     * 화면에 보이는 전체 이력을 보내므로, 보이는 것과 모델이 아는 것이
+     * 다시 일치합니다. */
+    setLastResponseId(null);
     const id = streamingIdRef.current;
     endStreaming();
-    if (id) setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)));
+    // 델타가 오기 전에 중단했으면 빈 말풍선을 지우고, 부분 응답은 남깁니다.
+    if (id) {
+      setMessages((prev) =>
+        prev
+          .filter((m) => !(m.id === id && !m.content))
+          .map((m) => (m.id === id ? { ...m, streaming: false } : m)),
+      );
+    }
   }, [endStreaming]);
 
   /** id로 메시지를 찾아 수정한다 — 위치에 의존하지 않습니다 */
@@ -483,7 +505,10 @@ export default function ChatInterface() {
       const baseMessages = historyOverride ?? messages;
       const history = [...baseMessages, userMsg]
         .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }))
+        // 서버가 어차피 이 개수만 쓰고, 무제한으로 보내면 긴 세션에서
+        // 본문 1MB 상한(413)에 걸려 이후 모든 전송이 실패합니다.
+        .slice(-MAX_HISTORY_MESSAGES);
 
       const assistantId = nextMessageId();
       streamingIdRef.current = assistantId;
@@ -574,6 +599,9 @@ export default function ChatInterface() {
               const message =
                 rawMessage === 'STREAM_TRUNCATED' ? t('chat.error') : rawMessage;
               endStreaming();
+              /* 실패한 턴은 응답 체인에 없습니다 (handleStop과 같은 이유).
+               * 체인을 비워 다음 턴이 화면의 전체 이력을 보내게 합니다. */
+              setLastResponseId(null);
               setMessages((prev) => [
                 // 내용이 하나도 없는 빈 말풍선은 제거하고, 부분 응답은 남깁니다.
                 ...prev.filter((m) => !(m.id === assistantId && !m.content)),
@@ -646,6 +674,11 @@ export default function ChatInterface() {
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
+      /* 한국어 IME 조합을 확정하는 Enter까지 전송으로 처리하면 안 됩니다.
+       * 조합 중 Enter는 isComposing=true(크롬은 keyCode 229)로 오는데,
+       * 이걸 그대로 보내면 조합 중이던 마지막 음절이 입력창에 남거나
+       * 메시지가 두 번 전송됩니다 — 한국어 입력의 고전적인 버그입니다. */
+      if (e.nativeEvent.isComposing || e.keyCode === 229) return;
       e.preventDefault();
       sendMessage();
     }

@@ -5,6 +5,13 @@ main = ".open-next/worker.js"
 compatibility_date = "2026-03-11"
 compatibility_flags = ["nodejs_compat"]
 
+# 대체 출처 차단. 이 둘이 없으면 myofferagent.workers.dev와 버전별 프리뷰 URL이
+# **같은 워커(실 OPENAI_API_KEY 시크릿 포함)** 를 서빙합니다. 커스텀 도메인의
+# 존 보호(WAF/HSTS)를 우회하는 공개 엔드포인트이자, 개인 키로 과금되는 표면입니다.
+# 프로덕션은 커스텀 도메인으로만 접근합니다.
+workers_dev = false
+preview_urls = false
+
 [assets]
 directory = ".open-next/assets"
 binding = "ASSETS"

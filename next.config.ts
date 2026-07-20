@@ -55,9 +55,16 @@ const SECURITY_HEADERS = [
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
   { key: 'X-Frame-Options', value: 'DENY' },
+  /* HSTS. Cloudflare는 커스텀 도메인에 이걸 자동으로 붙이지 않습니다. 없으면 최초
+   * 방문(또는 만료 후) http:// 접속이 적대적 네트워크에서 다운그레이드될 수 있고,
+   * 이 앱은 페이지에 이력서 PII를 붙여넣으므로 세션 스트리핑 = 전면 PII 가로채기입니다. */
+  { key: 'Strict-Transport-Security', value: 'max-age=63072000; includeSubDomains' },
+  /* window.opener를 끊어 탭내빙·XS-Leaks 표면을 줄입니다 (이 앱은 팝업/OAuth 없음). */
+  { key: 'Cross-Origin-Opener-Policy', value: 'same-origin' },
   {
     key: 'Permissions-Policy',
-    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    // interest-cohort(FLoC)는 폐기됐지만 구형 대비 남기고, 후속인 browsing-topics도 함께 opt-out.
+    value: 'camera=(), microphone=(), geolocation=(), interest-cohort=(), browsing-topics=()',
   },
 ];
 

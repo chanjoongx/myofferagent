@@ -23,7 +23,9 @@ const check = (name, pass, detail = '') => {
 };
 
 const browser = await chromium.launch();
-const page = await browser.newPage();
+// 로케일을 고정합니다 — 지정하지 않으면 OS 언어를 따라가서, 이 하네스의
+// 한국어 라벨('이름', '메시지를 입력하세요...') 검증이 머신에 따라 흔들립니다.
+const page = await browser.newPage({ locale: 'ko-KR' });
 
 /* ── 콘솔·네트워크 수집 ── */
 const consoleErrors = [];
@@ -119,8 +121,60 @@ try {
 check('MD 내보내기 동작', !!downloaded, downloaded ?? 'no download');
 check('파일명에 한글 이름이 살아있음', !!downloaded && downloaded.includes('박지우'), downloaded ?? '');
 
-/* ══════════ 6. 콘솔 에러 ══════════ */
-console.log('\n\x1b[1m═══ 6. 콘솔 ═══\x1b[0m');
+/* ══════════ 6. 한국어 IME 조합 중 Enter ══════════
+ * 조합을 확정하는 Enter(isComposing=true)가 메시지를 전송해 버리면
+ * 마지막 음절이 입력창에 남는 고전적인 한국어 입력 버그가 됩니다.
+ * 합성 KeyboardEvent로 가드를 검증합니다 — 모델 호출 없음(fetch를 막아 둠). */
+console.log('\n\x1b[1m═══ 6. IME 조합 Enter 가드 ═══\x1b[0m');
+
+const imeResult = await page.evaluate(async () => {
+  const ta = document.querySelector('textarea');
+  if (!ta) return null;
+  // 가드가 회귀해도 실제 API 호출(과금)이 나가지 않도록 막습니다.
+  window.fetch = () => new Promise(() => {});
+  const setter = Object.getOwnPropertyDescriptor(
+    window.HTMLTextAreaElement.prototype,
+    'value',
+  ).set;
+  setter.call(ta, '안녕하세요');
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  await new Promise((r) => setTimeout(r, 50));
+
+  ta.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }),
+  );
+  await new Promise((r) => setTimeout(r, 150));
+  const afterComposing = ta.value;
+
+  ta.dispatchEvent(
+    new KeyboardEvent('keydown', { key: 'Enter', isComposing: false, bubbles: true, cancelable: true }),
+  );
+  await new Promise((r) => setTimeout(r, 150));
+  const afterPlain = ta.value;
+  return { afterComposing, afterPlain };
+});
+check('IME 조합 중 Enter는 전송하지 않음', imeResult?.afterComposing === '안녕하세요', `"${imeResult?.afterComposing}"`);
+check('일반 Enter는 전송함 (합성 이벤트 대조군)', imeResult?.afterPlain === '', `"${imeResult?.afterPlain}"`);
+
+/* ══════════ 7. 다중 탭 이력서 동기화 ══════════
+ * 같은 브라우저 컨텍스트(=같은 localStorage)의 두 탭에서, 한쪽의 편집이
+ * storage 이벤트로 다른 쪽에 반영되는지 봅니다. 동기화가 없으면 탭마다
+ * 메모리 사본이 따로 놀다가 마지막 저장이 다른 탭의 편집을 덮어씁니다. */
+console.log('\n\x1b[1m═══ 7. 다중 탭 동기화 ═══\x1b[0m');
+
+const syncCtx = await browser.newContext({ locale: 'ko-KR' });
+const tabA = await syncCtx.newPage();
+const tabB = await syncCtx.newPage();
+await tabA.goto(`${BASE}/agent`, { waitUntil: 'networkidle' });
+await tabB.goto(`${BASE}/agent`, { waitUntil: 'networkidle' });
+await tabA.getByLabel('이름', { exact: true }).first().fill('동기화확인');
+await tabA.waitForTimeout(800); // 디바운스 저장(400ms) + storage 이벤트 전파 여유
+const syncedName = await tabB.getByLabel('이름', { exact: true }).first().inputValue();
+check('탭 A의 편집이 탭 B에 반영됨 (storage 동기화)', syncedName === '동기화확인', `"${syncedName}"`);
+await syncCtx.close();
+
+/* ══════════ 8. 콘솔 에러 ══════════ */
+console.log('\n\x1b[1m═══ 8. 콘솔 ═══\x1b[0m');
 const realErrors = consoleErrors.filter(
   (e) => !/favicon|404 \(Not Found\)|Download the React DevTools/i.test(e),
 );

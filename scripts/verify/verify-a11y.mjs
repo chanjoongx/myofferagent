@@ -36,7 +36,7 @@ const browser = await chromium.launch();
 
 /* ════════ 1. 뷰포트 메타 — 줌 차단 해제 ════════ */
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'ko-KR' });
   await page.goto(`${BASE}/agent`, { waitUntil: 'domcontentloaded' });
   const vp = await page.getAttribute('meta[name="viewport"]', 'content');
   check(
@@ -52,7 +52,7 @@ const browser = await chromium.launch();
    React가 아예 없으므로, html에 클래스를 붙일 수 있는 것은
    <head>의 인라인 스크립트뿐입니다. 이게 되면 깜빡임이 없다는 증명입니다. */
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'ko-KR' });
   await page.route('**/_next/static/**/*.js', (r) => r.abort());
   await page.addInitScript(() => {
     localStorage.setItem('theme', 'light');
@@ -75,7 +75,7 @@ const browser = await chromium.launch();
 
 /* ════════ 3. 하이드레이션 오류 없음 ════════ */
 {
-  const page = await browser.newPage();
+  const page = await browser.newPage({ locale: 'ko-KR' });
   const errs = [];
   page.on('console', (m) => {
     if (m.type() === 'error') errs.push(m.text());
@@ -96,7 +96,7 @@ const browser = await chromium.launch();
 
 /* ════════ 4. placeholder 대비 ════════ */
 {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ locale: 'ko-KR', viewport: { width: 1280, height: 900 } });
   await page.goto(`${BASE}/agent`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
 
@@ -150,7 +150,7 @@ const browser = await chromium.launch();
 
 /* ════════ 5. 데스크톱: 모달이 아니어야 함 + 레이아웃 ════════ */
 {
-  const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  const page = await browser.newPage({ locale: 'ko-KR', viewport: { width: 1280, height: 900 } });
   await page.goto(`${BASE}/agent`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
 
@@ -181,7 +181,7 @@ const browser = await chromium.launch();
 
 /* ════════ 6. 모바일: 진짜 모달 ════════ */
 {
-  const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  const page = await browser.newPage({ locale: 'ko-KR', viewport: { width: 390, height: 844 } });
   await page.goto(`${BASE}/agent`, { waitUntil: 'networkidle' });
   await page.waitForTimeout(800);
 

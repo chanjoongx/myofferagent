@@ -86,7 +86,8 @@ async function turn(state, message, opts = {}) {
   if (events.done) {
     const p = events.done;
     console.log(
-      `    ${c.dim('payload:')} structured=${p.structuredData?.type ?? 'none'} ` +
+      // structuredData는 배열입니다 — 이전에는 .type을 찍어 항상 'none'이 나왔습니다.
+      `    ${c.dim('payload:')} structured=${(p.structuredData ?? []).map((x) => x?.type).filter(Boolean).join('+') || 'none'} ` +
         `resumeDoc=${p.resumeDoc ? 'yes' : 'no'} outLen=${p.output.length}`,
     );
     if (text) console.log(c.dim(`    reply: ${text.replace(/\s+/g, ' ').slice(0, 160)}…`));

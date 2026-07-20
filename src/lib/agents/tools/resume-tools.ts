@@ -352,7 +352,9 @@ Return JSON: { "improved": [ { "original": string, "rewritten": string, "why": s
     const payload = JSON.stringify({ context: input.context, bullets: input.bullets });
 
     const result = await callJson(ImprovedBulletsSchema, system, payload, {
-      model: MODEL_CONFIG.fast,
+      /* 불릿 문장의 품질이 곧 이 제품의 값어치입니다. 여기서 아끼면
+       * 사용자가 받아 가는 결과물이 그대로 나빠집니다. */
+      model: MODEL_CONFIG.standard,
       maxTokens: 1_500,
       signal: ctx.signal,
     });

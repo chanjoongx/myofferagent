@@ -17,6 +17,7 @@ import ResumePanel from "@/components/resume/ResumePanel";
 import JobCard from "@/components/jobs/JobCard";
 import { extractTextFromPDF, preloadPdfJs } from "@/components/pdf-loader";
 import { useLanguage } from "@/lib/i18n-context";
+import { useMediaQuery, useModalOverlay, MOBILE_QUERY } from "@/lib/use-modal-overlay";
 import { useToast } from "@/components/ui/Toast";
 import { useResume } from "@/lib/resume/use-resume";
 import { streamAgent } from "@/lib/agent-client";
@@ -81,9 +82,9 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
             {t("match.matchedKeywords")}
           </h4>
           <div className="flex flex-wrap gap-1.5">
-            {data.keywordGap.matched.map((kw) => (
+            {data.keywordGap.matched.map((kw, i) => (
               <span
-                key={kw}
+                key={`${kw}-${i}`}
                 className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] text-emerald-400"
               >
                 {kw}
@@ -96,9 +97,9 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
             {t("match.missingKeywords")}
           </h4>
           <div className="flex flex-wrap gap-1.5">
-            {data.keywordGap.missing.map((kw) => (
+            {data.keywordGap.missing.map((kw, i) => (
               <span
-                key={kw}
+                key={`${kw}-${i}`}
                 className="rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[11px] text-orange-400"
               >
                 {kw}
@@ -216,6 +217,13 @@ export default function ChatInterface() {
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   const [panelOpen, setPanelOpen] = useState(false);
+  const panelRef = useRef<HTMLElement>(null);
+  /* 패널은 모바일에서만 오버레이입니다. 데스크톱에서는 나란히 놓인 컬럼이라
+   * 포커스 트랩·Escape 닫기·스크롤 잠금을 걸면 오히려 방해가 됩니다. */
+  const isMobile = useMediaQuery(MOBILE_QUERY);
+  const panelIsModal = panelOpen && isMobile;
+  const closePanel = useCallback(() => setPanelOpen(false), []);
+  useModalOverlay(panelIsModal, panelRef, closePanel);
 
   const currentAgentRef = useRef<string>(AGENT_NAMES.TRIAGE);
   /** 지금 스트리밍 중인 assistant 말풍선의 id */
@@ -370,7 +378,10 @@ export default function ChatInterface() {
       if (newAgent === prev) return;
       currentAgentRef.current = newAgent;
 
-      setCompletedAgents((done) => (done.includes(prev) ? done : [...done, prev]));
+      /* 여기서는 완료 처리를 하지 않습니다.
+       * 전환했다는 사실은 이전 에이전트가 **무언가 해냈다**는 뜻이 아닙니다.
+       * 완료 여부는 서버가 실제 도구 실행을 보고 `payload.completedAgents`로
+       * 알려줍니다. */
       setMessages((msgs) => [
         ...msgs,
         { id: nextMessageId(), role: "system", content: t("chat.agentSwitch", { agent: newAgent }) },
@@ -532,6 +543,14 @@ export default function ChatInterface() {
               streamingIdRef.current = null;
 
               if (payload.lastResponseId) setLastResponseId(payload.lastResponseId);
+
+              // 서버가 알려준 "실제로 일한 에이전트"만 완료로 표시합니다.
+              if (payload.completedAgents?.length) {
+                setCompletedAgents((prev) => [
+                  ...prev,
+                  ...payload.completedAgents!.filter((a) => !prev.includes(a)),
+                ]);
+              }
               // 서버가 이력서를 수정했으면 반영 (사용자 편집분과 병합된 최신본)
               if (payload.resumeDoc) {
                 // 응답을 기다리는 20~40초 사이에 사용자가 패널에서 고친 내용을
@@ -849,12 +868,15 @@ export default function ChatInterface() {
       {/* ── 이력서 패널 ──
           데스크톱: 우측 고정 컬럼 / 모바일: 토글 오버레이 */}
       <aside
+        ref={panelRef}
         className={`
           border-surface-border bg-surface
           ${panelOpen ? "fixed inset-0 z-40 flex flex-col" : "hidden"}
           md:static md:z-auto md:flex md:w-80 lg:w-96 md:shrink-0 md:flex-col md:border-l
           ${keyboardOpen ? "md:flex" : ""}
         `}
+        role={panelIsModal ? "dialog" : undefined}
+        aria-modal={panelIsModal || undefined}
         aria-label={t("resume.title")}
       >
         {/* 모바일 닫기 바 */}
@@ -862,7 +884,7 @@ export default function ChatInterface() {
           <div className="flex items-center justify-between border-b border-surface-border px-4 py-3 md:hidden">
             <span className="text-sm font-semibold">{t("resume.title")}</span>
             <button
-              onClick={() => setPanelOpen(false)}
+              onClick={closePanel}
               className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-elevated"
               aria-label={t("resume.hide")}
             >

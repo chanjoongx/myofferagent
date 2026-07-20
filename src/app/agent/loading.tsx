@@ -1,6 +1,16 @@
+/**
+ * /agent 진입 시 보여 주는 스켈레톤.
+ *
+ * 구조는 실제 화면과 **동일해야** 합니다: `.app-shell`이 세로 컨테이너이고,
+ * 그 안의 요소가 반응형으로 가로 배치를 맡습니다 (page.tsx + ChatInterface와 동일).
+ * 예전에는 `flex app-shell`만 주고 사이드바·채팅을 직접 자식으로 두었는데,
+ * `.app-shell`의 `flex-direction: column` 때문에 **사이드바가 채팅 위로 쌓이고**
+ * 오른쪽 테두리가 화면 중간에 떠 있었습니다.
+ */
 export default function AgentLoading() {
   return (
-    <div className="flex app-shell w-full">
+    <div className="app-shell w-full">
+      <div className="flex flex-1 min-h-0 flex-col md:flex-row">
       {/* Sidebar skeleton */}
       <div className="hidden md:flex w-60 lg:w-64 shrink-0 flex-col border-r border-surface-border glass p-5 gap-4">
         {/* Logo */}
@@ -46,6 +56,7 @@ export default function AgentLoading() {
             <div className="h-9 w-9 rounded-lg bg-surface-border animate-pulse" />
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

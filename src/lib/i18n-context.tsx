@@ -3,12 +3,17 @@
 import {
   createContext,
   useContext,
-  useState,
-  useEffect,
   useCallback,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
 import { type Locale, t as translate } from "./i18n";
+import {
+  subscribeLocale,
+  getLocaleSnapshot,
+  getLocaleServerSnapshot,
+  setLocale as persistLocale,
+} from "./prefs-store";
 
 interface I18nContextType {
   locale: Locale;
@@ -22,27 +27,17 @@ const I18nContext = createContext<I18nContextType>({
   t: (key) => key,
 });
 
-/** 브라우저 저장값 또는 시스템 언어에서 초기 로케일을 결정 */
-function getInitialLocale(): Locale {
-  if (typeof window === "undefined") return "ko";
-  const saved = localStorage.getItem("locale") as Locale | null;
-  if (saved === "ko" || saved === "en") return saved;
-  const browser = navigator.language || "";
-  return browser.startsWith("en") ? "en" : "ko";
-}
-
 export function LanguageProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
-
-  // DOM lang 속성 동기화
-  useEffect(() => {
-    document.documentElement.lang = locale;
-  }, [locale]);
-
-  const setLocale = (l: Locale) => {
-    setLocaleState(l);
-    localStorage.setItem("locale", l);
-  };
+  /* 언어는 localStorage와 navigator.language에서 오므로 서버가 알 수 없습니다.
+   * 예전에는 useState 초기화 함수에서 읽어 하이드레이션 불일치를 냈고,
+   * 영어 브라우저 사용자는 한국어로 그려진 화면이 영어로 바뀌는 것을 봤습니다.
+   * 서버/클라이언트 스냅샷을 분리해 React가 이 차이를 정상 처리하도록 합니다.
+   * (html의 lang 속성은 layout.tsx의 인라인 스크립트가 페인트 전에 맞춥니다.) */
+  const locale = useSyncExternalStore(
+    subscribeLocale,
+    getLocaleSnapshot,
+    getLocaleServerSnapshot,
+  );
 
   const tFn = useCallback(
     (key: string, params?: Record<string, string>) => translate(locale, key, params),
@@ -50,7 +45,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <I18nContext.Provider value={{ locale, setLocale, t: tFn }}>
+    <I18nContext.Provider value={{ locale, setLocale: persistLocale, t: tFn }}>
       {children}
     </I18nContext.Provider>
   );

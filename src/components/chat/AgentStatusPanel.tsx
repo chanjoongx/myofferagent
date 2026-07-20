@@ -72,7 +72,7 @@ export default memo(function AgentStatusPanel({
       <Link
         href="/"
         className="hidden md:flex items-center gap-2 px-5 pt-5 pb-2 text-sm font-semibold tracking-tight text-text-primary hover:text-accent transition-colors"
-        aria-label="Go to home page"
+        aria-label={t("nav.home")}
       >
         <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent text-surface">
           <Zap className="h-3.5 w-3.5" strokeWidth={2.2} />
@@ -90,7 +90,7 @@ export default memo(function AgentStatusPanel({
           onClick={() => setMobileOpen(!mobileOpen)}
           className="flex w-full items-center gap-3 px-4 py-3"
           aria-expanded={mobileOpen}
-          aria-label="Toggle agent list"
+          aria-label={t("sidebar.toggleAgents")}
         >
           {/* Current agent icon */}
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-accent text-surface">
@@ -162,7 +162,7 @@ export default memo(function AgentStatusPanel({
                         ? "bg-accent/10 border border-accent/30"
                         : isDone
                           ? "opacity-60"
-                          : "opacity-30"
+                          : "opacity-60"
                     } ${canClick ? "hover:bg-accent/5 cursor-pointer" : "cursor-default"}`}
                   >
                     <div
@@ -194,7 +194,7 @@ export default memo(function AgentStatusPanel({
                 href="/"
                 onClick={() => setMobileOpen(false)}
                 className="flex h-8 items-center justify-center rounded-lg border border-surface-border bg-surface-elevated/40 px-2.5 text-text-secondary hover:border-accent/40 hover:text-accent transition-colors"
-                aria-label="Go to home page"
+                aria-label={t("nav.home")}
               >
                 <Zap className="h-3.5 w-3.5" strokeWidth={2} />
               </Link>
@@ -282,7 +282,7 @@ export default memo(function AgentStatusPanel({
                     ? "bg-accent/10 border border-accent/40"
                     : isDone
                       ? "opacity-70"
-                      : "opacity-35"
+                      : "opacity-60"
                 } ${canClick ? "hover:bg-accent/5 hover:opacity-100 cursor-pointer" : "cursor-default"}`}
                 aria-current={isCurrent ? "step" : undefined}
               >

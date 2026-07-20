@@ -28,7 +28,9 @@ const BASE =
   'w-full bg-transparent outline-none rounded px-1 -mx-1 transition-colors ' +
   'border border-transparent hover:border-surface-border ' +
   'focus:border-accent/50 focus:bg-surface/40 ' +
-  'placeholder:text-text-secondary/40 placeholder:italic';
+  /* placeholder는 장식이 아니라 **필드 설명**입니다 (이름/이메일/학교…).
+   * /40은 대비 1.62:1로 WCAG AA(4.5:1)에 한참 못 미쳤습니다. */
+  'placeholder:text-text-secondary placeholder:italic';
 
 export default function EditableText({
   value,
@@ -59,7 +61,12 @@ export default function EditableText({
 
   // Escape로 포커스를 빠져나갈 수 있게 합니다 (모바일 키보드 닫기)
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    if (e.key === 'Escape') e.currentTarget.blur();
+    if (e.key !== 'Escape') return;
+    /* 모바일에서 이 패널은 모달이라 Escape로 닫히지만, 편집 중일 때는
+     * 닫지 않고 블러만 합니다. 그 판단은 useModalOverlay가 이벤트 대상을
+     * 보고 내립니다 — 여기서 stopPropagation을 해도 소용없기 때문입니다
+     * (React 리스너도 같은 document에 붙어 있어 서로를 막지 못합니다). */
+    e.currentTarget.blur();
   };
 
   if (multiline) {

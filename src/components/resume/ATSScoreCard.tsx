@@ -119,9 +119,9 @@ export default function ATSScoreCard({ analysis }: ATSScoreCardProps) {
             {t("ats.strengths")}
           </h4>
           <div className="flex flex-wrap gap-2">
-            {analysis.topStrengths.map((s) => (
+            {analysis.topStrengths.map((s, i) => (
               <span
-                key={s}
+                key={`${s}-${i}`}
                 className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-400"
               >
                 {s}
@@ -138,9 +138,9 @@ export default function ATSScoreCard({ analysis }: ATSScoreCardProps) {
             {t("ats.improvements")}
           </h4>
           <div className="flex flex-wrap gap-2">
-            {analysis.criticalImprovements.map((item) => (
+            {analysis.criticalImprovements.map((item, i) => (
               <span
-                key={item}
+                key={`${item}-${i}`}
                 className="rounded-full bg-orange-500/15 px-3 py-1 text-xs text-orange-400"
               >
                 {item}

@@ -29,6 +29,11 @@ export interface AgentResponse {
    * 공고 목록과 매칭 분석이 동시에 나옵니다. 단수였을 때는 한쪽이 조용히 버려졌습니다.
    */
   structuredData: StructuredData[];
+  /**
+   * 이번 턴에 **실제로 도구를 실행한** 에이전트 이름들.
+   * 사이드바의 완료 체크에 씁니다 — 단순히 거쳐 간 것은 포함하지 않습니다.
+   */
+  completedAgents?: string[];
   /** 이번 턴에 이력서가 바뀐 경우에만 포함 */
   resumeDoc?: ResumeDocument;
   lastResponseId?: string;    // 이 턴의 response ID → 프론트가 다음 요청에 돌려보냄

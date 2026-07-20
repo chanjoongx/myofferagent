@@ -135,7 +135,11 @@ Shape:
     const payload = fence('RESUME_TEXT', input.text, { maxLength: 50_000 });
 
     const parsed = await callJson(ParsedResumeSchema, system, payload, {
-      model: MODEL_CONFIG.fast,
+      /* 이 호출은 제품의 **입구**입니다 — PDF 한 장을 통째로 구조화합니다.
+       * 경량 모델이 경력 한 줄을 조용히 빠뜨리면 사용자는 알아채지 못한 채
+       * 빠진 이력서로 지원하게 됩니다. 임포트당 한 번뿐인 호출이라
+       * 비용 차이보다 누락 위험이 훨씬 비쌉니다. */
+      model: MODEL_CONFIG.standard,
       maxTokens: 4_000,
       signal: ctx.signal,
     });

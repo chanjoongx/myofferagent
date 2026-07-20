@@ -22,12 +22,13 @@ const TYPE_STYLES: Record<
 const TYPE_FALLBACK = { labelKey: "job.onsite", className: "bg-gray-500/15 text-gray-400" };
 
 function MiniMatchRing({ value }: { value: number }) {
+  const { t } = useLanguage();
   const r = 16;
   const c = 2 * Math.PI * r;
   const offset = c - (value / 100) * c;
 
   return (
-    <div className="relative flex items-center justify-center shrink-0" role="img" aria-label={`Match ${value}%`}>
+    <div className="relative flex items-center justify-center shrink-0" role="img" aria-label={t("job.matchLabel", { value: String(value) })}>
       <svg width="44" height="44" viewBox="0 0 44 44">
         <circle
           cx="22"

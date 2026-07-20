@@ -5,6 +5,7 @@ import ReactMarkdown, { type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Bot, ArrowRightLeft, Copy, Check } from "lucide-react";
 import { isSafeUrl } from "@/lib/url-utils";
+import { useLanguage } from "@/lib/i18n-context";
 
 interface MessageBubbleProps {
   role: "user" | "assistant" | "system";
@@ -142,6 +143,7 @@ function MessageBubble({
   timestamp,
   streaming,
 }: MessageBubbleProps) {
+  const { t } = useLanguage();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(() => {
@@ -234,14 +236,14 @@ function MessageBubble({
         {/* Footer: timestamp + copy */}
         <div className={`flex items-center gap-2 px-1 ${isUser ? "justify-end" : "justify-start"}`}>
           {time && (
-            <span className="text-[10px] text-text-secondary/40">{time}</span>
+            <span className="text-[10px] text-text-secondary/70">{time}</span>
           )}
           {/* 스트리밍 중에는 불완전한 텍스트를 복사하지 않도록 감춥니다 */}
           {!streaming && (
             <button
               onClick={handleCopy}
-              className="md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity rounded p-0.5 text-text-secondary/40 hover:text-text-secondary"
-              aria-label="Copy message"
+              className="md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity rounded p-0.5 text-text-secondary/70 hover:text-text-secondary"
+              aria-label={t("chat.copyMessage")}
             >
               {copied ? (
                 <Check className="h-3 w-3 text-accent" />

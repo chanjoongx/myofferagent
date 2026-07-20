@@ -51,6 +51,9 @@ const MAX_TURNS = 20;
 const MAX_RESUME_TEXT = 60_000;
 const MAX_MESSAGE_CHARS = 12_000;
 
+/** 호출해도 "작업을 완료했다"고 볼 수 없는 조회 전용 도구 */
+const READ_ONLY_TOOLS = new Set(['get_resume']);
+
 /* ────────────────────────────────────────────
    SSE 헬퍼
    ──────────────────────────────────────────── */
@@ -234,6 +237,12 @@ export async function POST(req: Request): Promise<Response> {
         let activeAgent: string = startAgent.name;
         let text = '';
 
+        /* 실제로 **의미 있는 작업을 수행한** 에이전트만 기록합니다.
+         * 사이드바의 완료 체크가 예전에는 "다른 에이전트로 넘어갔다"는 이유만으로
+         * 붙었습니다. Triage에서 인사만 하고 Scout으로 가도 Triage가 완료로
+         * 표시돼서, 체크 표시가 진행 상황을 전혀 나타내지 못했습니다. */
+        const workedAgents = new Set<string>();
+
         try {
           send({ type: 'agent', name: activeAgent });
 
@@ -255,7 +264,10 @@ export async function POST(req: Request): Promise<Response> {
                   send({ type: 'tool_start', tool: rawItem?.name ?? 'tool' });
                 } else if (event.name === 'tool_output') {
                   const rawItem = event.item.rawItem as { name?: string };
-                  send({ type: 'tool_end', tool: rawItem?.name ?? 'tool' });
+                  const toolName = rawItem?.name ?? 'tool';
+                  send({ type: 'tool_end', tool: toolName });
+                  // 조회 전용 도구는 "작업했다"로 치지 않습니다.
+                  if (!READ_ONLY_TOOLS.has(toolName)) workedAgents.add(activeAgent);
                 }
                 break;
               }
@@ -284,6 +296,7 @@ export async function POST(req: Request): Promise<Response> {
             payload: {
               output: finalOutput,
               activeAgent: streamed.currentAgent?.name ?? activeAgent,
+              completedAgents: [...workedAgents],
               structuredData: collectStructured(),
               ...(ctx.resumeTouched ? { resumeDoc: ctx.resume } : {}),
               ...(streamed.lastResponseId ? { lastResponseId: streamed.lastResponseId } : {}),

@@ -14,7 +14,9 @@
     "check:models": "node scripts/check-models.mjs",
     "cf:build": "node scripts/cf-build.mjs",
     "cf:preview": "npm run cf:build && npx wrangler dev",
-    "cf:deploy": "npm run cf:build && npx wrangler deploy"
+    "cf:deploy": "npm run cf:build && npx wrangler deploy",
+    "verify:local": "node scripts/verify/browser.mjs http://localhost:8787 scripts/verify && node scripts/verify/verify-a11y.mjs http://localhost:8787 && node scripts/verify/verify-checkmarks.mjs http://localhost:8787 && node scripts/verify/e2e.mjs http://localhost:8787 all",
+    "verify:prod": "node scripts/verify/verify-a11y.mjs https://myofferagent.com && node scripts/verify/e2e.mjs https://myofferagent.com all"
   },
   "dependencies": {
     "@openai/agents": "^0.6.0",

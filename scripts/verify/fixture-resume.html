@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Jiwoo_Park_Resume_Backend_Engineer</title>
+<style>
+  /* 여백을 @page가 아니라 body padding으로 잡습니다.
+   * Chrome은 페이지 여백이 약 8mm를 넘으면 URL·날짜·페이지 번호를 자동으로
+   * 끼워 넣고, 그대로 저장된 PDF에 인쇄됩니다. margin:0이면 그 머리말이
+   * 아예 생기지 않습니다.
+   * (한계: body padding의 상/하단은 첫 페이지와 마지막 페이지에만 적용됩니다.
+   *  신입 이력서는 1페이지가 표준이고 ATS 채점기도 1페이지를 넘기면 감점하므로
+   *  이 트레이드오프를 택했습니다.) */
+  @page { size: letter; margin: 0; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body {
+    font-family: Georgia, 'Times New Roman', Times, 'Malgun Gothic', 'Apple SD Gothic Neo', serif;
+    font-size: 10.5pt;
+    line-height: 1.38;
+    color: #000;
+    background: #fff;
+  }
+  body { padding: 0.6in; }
+
+  /* 섹션 헤더가 페이지 끝에 홀로 남지 않도록 */
+  h2 { break-after: avoid; page-break-after: avoid; }
+  p  { orphans: 2; widows: 2; }
+
+  /* 이름과 연락처 영역. 시맨틱 header 요소는 ATS가 통째로 버릴 수 있어 div로 둡니다. */
+  .name {
+    font-size: 20.5pt;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    margin-bottom: 3pt;
+  }
+  .contacts {
+    font-size: 9.7pt;
+    margin-bottom: 10pt;
+  }
+  .contacts a { color: #000; text-decoration: none; }
+  .sep { padding: 0 5pt; }
+
+  h2 {
+    font-size: 10.7pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    border-bottom: 0.75pt solid #000;
+    padding-bottom: 1.5pt;
+    margin: 11pt 0 5pt;
+  }
+
+  /* 항목이 페이지 경계에서 잘리지 않도록 */
+  .entry { margin-bottom: 7pt; page-break-inside: avoid; break-inside: avoid; }
+
+  .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12pt; }
+  .left { flex: 1; min-width: 0; }
+  .right { white-space: nowrap; font-size: 9.9pt; }
+
+  .role { font-weight: 700; }
+  .org  { font-weight: 400; }
+  .detail {
+    font-size: 9.9pt;
+    font-style: italic;
+    margin-top: 0.5pt;
+  }
+  .summary { margin-bottom: 2pt; }
+
+  ul { margin: 3pt 0 0 14pt; }
+  li { margin-bottom: 1.5pt; padding-left: 1pt; }
+
+  .skill-row { margin-bottom: 2pt; }
+  .skill-label { font-weight: 700; }
+
+  a { color: #000; }
+
+  @media print {
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }</style>
+</head>
+<body><div class="name">Jiwoo Park</div><div class="contacts"><a href="mailto:jiwoo@example.com">jiwoo@example.com</a><span class="sep">·</span>(949) 555-0142<span class="sep">·</span>Irvine, CA<span class="sep">·</span><a href="https://linkedin.com/in/jiwoo">linkedin.com/in/jiwoo</a><span class="sep">·</span><a href="https://github.com/jiwoo">github.com/jiwoo</a></div><h2>Education</h2><div class="entry"><div class="row"><div class="left"><span class="org">Seoul National University</span></div><div class="right">Feb 2026</div></div><div class="detail">B.S., Computer Science · GPA: 3.9/4.3</div></div><h2>Experience</h2><div class="entry"><div class="row"><div class="left"><span class="role">Backend Engineering Intern</span><span class="org"> — Naver</span></div><div class="right">Jun 2025 – Sep 2025</div></div><div class="detail">Seongnam</div><ul><li>Owned migration of 8 REST endpoints, dropping p99 latency from 240ms to 90ms</li><li>Wrote a batch pipeline processing 1.2M records nightly</li></ul></div><h2>Projects</h2><div class="entry"><div class="row"><div class="left"><span class="role">Kafka Benchmark Suite</span></div></div><div class="detail">Java, Kafka</div><ul><li>Benchmarked Kafka at 4k msg/s sustained throughput</li></ul></div><h2>Skills</h2><div class="entry"><div class="skill-row"><span class="skill-label">Languages:</span> Java, Python, TypeScript</div><div class="skill-row"><span class="skill-label">Frameworks:</span> Spring Boot, React</div><div class="skill-row"><span class="skill-label">Tools:</span> Docker, Git</div></div></body>
+</html>

@@ -446,6 +446,34 @@ interface ResumeDocument {
 
 ## 배포
 
+### ⚠️ 빌드는 반드시 webpack으로 (`next build --webpack`)
+
+Next 16의 `next build`는 기본이 **Turbopack**인데, 그 산출물은
+OpenNext의 청크 번들링과 호환되지 않습니다. 청크 파일이 디스크에 복사되고
+번들이 참조까지 하는데도 런타임에 못 찾습니다:
+
+```
+ChunkLoadError: Failed to load chunk
+  server/chunks/ssr/[root-of-the-server]__1oxu-6s._.js
+```
+
+증상이 **빌드가 아니라 배포 후 500**으로 나타나기 때문에 특히 위험합니다.
+`package.json`의 `build` 스크립트가 `--webpack`을 붙이고 있으니 지우지 마세요.
+(이 프로젝트는 원래 `next dev`도 `--webpack`으로 돌리고 있었습니다.)
+
+### ⚠️ GitHub 푸시 = 자동 배포
+
+Cloudflare Workers Builds가 이 저장소에 연결되어 있어 **`main`에 푸시하면
+자동으로 빌드·배포됩니다.** 즉 푸시 자체가 프로덕션 배포입니다.
+푸시 전에 반드시 로컬 workerd에서 확인하세요:
+
+```bash
+npm run cf:preview     # cf:build + wrangler dev (실제 workerd)
+```
+
+`npm run check`(타입·테스트·next build)는 **workerd를 전혀 검증하지 않습니다.**
+Turbopack 청크 문제도, wasm 번들링 문제도 여기서는 안 잡힙니다.
+
 ```bash
 npm run cf:deploy    # cf:build → wrangler deploy
 ```

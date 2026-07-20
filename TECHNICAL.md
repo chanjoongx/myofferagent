@@ -132,7 +132,7 @@ Per-agent notes:
 | Triage | none | routes only; cannot reach Match or Writer directly |
 | Resume Builder | patch tools + `improve_bullets` | save first, improve second; never invent numbers |
 | Resume Analyzer | `get_resume`, `import_resume_text`, `analyze_ats` | import replaces the document, confirm when one exists |
-| Job Scout | `webSearchTool()`, `report_jobs` | prompt limit 3 searches (code breaker at 5); always constrain to early career; flag sponsorship |
+| Job Scout | `webSearchTool()`, `report_jobs` | prompt limit 3 searches (code breaker at 8); always constrain to early career; flag sponsorship |
 | Match Strategy | `get_resume`, `report_match` | refuses to analyze without concrete posting details |
 | Application Writer | `get_resume` | 250-400 word cover letter grounded in the resume |
 
@@ -209,7 +209,7 @@ Response: `text/event-stream`. Every frame is `data: <JSON>\n\n` with one of:
 | Messages | last 50, each capped at 12,000 chars |
 | Resume text | 60,000 chars, minimum 50 to be treated as a resume |
 | Agent turns | `maxTurns: 20` |
-| Web searches | 5 per request; exceeding aborts the run (cost circuit breaker) |
+| Web searches | 8 per request; exceeding aborts the run (cost circuit breaker; a single model response was measured bursting to 6, and hosted-tool calls inside one response cannot be interrupted anyway, so the breaker targets cross-turn loops) |
 | Rate | 20 requests / 60s per IP at the edge |
 
 ---
@@ -277,8 +277,10 @@ mention them.
 ### `web_search`
 
 The SDK's hosted tool. Costs real money per call. Bounded by prompt (3) and by the
-route-level circuit breaker (5 per request, then the run is aborted and the user gets
-the standard error; resume changes still round-trip via the `resume` event).
+route-level circuit breaker (8 per request, then the run is aborted and the user gets
+the standard error; resume changes still round-trip via the `resume` event). Hosted
+calls execute inside the model's response, so the breaker cannot undo a burst within
+one response; its job is to stop search loops that span turns.
 
 ### Shared client (`openai-client.ts`)
 
@@ -439,7 +441,7 @@ errors fall through to the fallback.
 
 ### Cost controls
 
-- Paid web search: prompt-limited to 3, hard-aborted at 5 per request
+- Paid web search: prompt-limited to 3, hard-aborted at 8 per request
 - `maxTurns: 20`, all size caps above, and per-IP rate limiting bound the worst case
 - Sub-calls carry the request abort signal, so a user stop actually stops billing
 

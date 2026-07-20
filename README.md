@@ -127,7 +127,7 @@ leaving the chat.
 **Security**
 - Edge rate limiting with Cloudflare's native rate limiting binding (20 requests/min per IP, aggregated globally, not per-isolate)
 - Prompt injection defenses: untrusted text is fenced with marker folding, ATS scoring runs in an isolated model call, and a code-level check rejects rewritten bullets that invent numbers
-- Request caps enforced on real bytes: 1 MB body, 50 messages, 12k chars per message, 60k chars of resume text, 20 agent turns, at most 5 paid web searches per request
+- Request caps enforced on real bytes: 1 MB body, 50 messages, 12k chars per message, 60k chars of resume text, 20 agent turns, at most 8 paid web searches per request
 - Strict CSP with no external script or connect origins besides Cloudflare Analytics; markdown images are never rendered (blocks zero-click data exfiltration)
 
 **Interface**

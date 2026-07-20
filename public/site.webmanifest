@@ -1,7 +1,7 @@
 {
   "name": "My Offer Agent",
   "short_name": "OfferAgent",
-  "description": "AI-Powered Career Assistant — Resume building, ATS analysis, job search, and application writing",
+  "description": "AI career agent for resume building, ATS analysis, job search, and application writing",
   "start_url": "/agent",
   "display": "standalone",
   "background_color": "#0a0a0f",

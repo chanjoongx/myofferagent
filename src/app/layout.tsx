@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://myofferagent.com"),
   title: "My Offer Agent | AI Career Agent",
   description:
-    "AI-powered career agent — resume building, ATS analysis, job matching, and cover letter generation.",
+    "AI career agent for resume building, ATS analysis, job matching, and cover letter generation.",
   manifest: "/site.webmanifest",
   robots: {
     index: false,
@@ -43,7 +43,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "My Offer Agent",
     description:
-      "AI-powered career agent — resume building, ATS analysis, job matching, and cover letter generation.",
+      "AI career agent for resume building, ATS analysis, job matching, and cover letter generation.",
     type: "website",
     siteName: "My Offer Agent",
     url: "https://myofferagent.com",
@@ -52,14 +52,14 @@ export const metadata: Metadata = {
         url: "/opengraph-image",
         width: 1200,
         height: 630,
-        alt: "My Offer Agent — AI-Powered Career Assistant",
+        alt: "My Offer Agent, an AI career agent",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "My Offer Agent",
-    description: "AI-powered career agent — resume, ATS, job matching",
+    description: "AI career agent for resume building, ATS analysis, and job matching.",
   },
   other: {
     "msapplication-TileColor": "#14b8a6",

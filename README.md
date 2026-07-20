@@ -1,21 +1,18 @@
 <div align="center">
 
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/logo.svg" alt="My Offer Agent" width="90" height="90" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/logo.svg" alt="My Offer Agent logo" width="90" height="90" />
 
 <br />
 <br />
 
 # My Offer Agent
 
-**AI-Powered Career Agent** — From resume building to job matching,<br />powered by 6 specialized AI agents.
+**AI career agent for the US job hunt.** Six specialized agents cover resume building,
+ATS analysis, live job search, match strategy, and cover letters in one chat.
 
 Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myofferagent.com](https://myofferagent.com)
 
-<br />
-
-🚀 **Solo Project** · 6 AI Agents
-
-<br />
+Solo project · 6 AI agents
 
 <a href="https://myofferagent.com">Website</a> · <a href="#getting-started">Getting Started</a>
 
@@ -27,7 +24,7 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myoffe
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS_v4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
 ![OpenAI](https://img.shields.io/badge/OpenAI_Agents_SDK-412991?style=flat-square&logo=openai&logoColor=white)
 ![Claude](https://img.shields.io/badge/Built_with_Claude-D97706?style=flat-square&logo=anthropic&logoColor=white)
-![Cloudflare](https://img.shields.io/badge/Cloudflare_Pages-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+![Cloudflare](https://img.shields.io/badge/Cloudflare_Workers-F38020?style=flat-square&logo=cloudflare&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)
 
 </div>
@@ -35,61 +32,68 @@ Built for the **2026 Global PBL 1st Hackathon** in Irvine, CA · Live at [myoffe
 <br />
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/home.png" alt="My Offer Agent — Home" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/home.png" alt="Landing page of My Offer Agent" width="960" />
 </div>
 
 <br />
 
 ## About
 
-Job seekers often juggle multiple tools — resume builders, job boards, ATS checkers, and cover letter generators. **My Offer Agent** brings it all into one conversational interface.
-
-It's a career assistant where 6 specialized AI agents collaborate to help you land your next job. Upload your resume, search for jobs, get ATS analysis, and generate tailored cover letters — all through a single chat. Each agent handles a specific domain and seamlessly hands off to the next when needed, powered by the [OpenAI Agents SDK](https://github.com/openai/openai-agents-js).
+Job seekers juggle separate tools for resumes, job boards, ATS checks, and cover letters.
+My Offer Agent puts those steps into one conversation. Six agents built on the
+[OpenAI Agents SDK](https://github.com/openai/openai-agents-js) each own one domain and
+hand off to the next when the conversation calls for it. Upload a resume PDF, get a
+100-point ATS score, search live postings, and draft a tailored cover letter without
+leaving the chat.
 
 <br />
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_interface.png" alt="My Offer Agent — Chat Interface" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_interface.png" alt="Chat interface with the agent sidebar and resume panel" width="960" />
 </div>
 
 <br />
 
 ## Demo
 
-### 💬 Smart Conversation & Agent Handoff
+### Conversation and agent handoff
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_demo.png" alt="Chat Demo — Greeting, capabilities, and automatic agent handoff" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/chat_demo.png" alt="Chat demo: greeting, capabilities, and automatic handoff to Job Scout" width="960" />
 </div>
 
-> The Triage agent greets users, explains available features, and automatically hands off to the right specialist — like Job Scout — when it detects intent.
+> The Triage agent greets users, explains what the service can do, and hands off to the
+> right specialist (here, Job Scout) as soon as it detects intent.
 
 <br />
 
-### 📄 ATS Resume Analysis
+### ATS resume analysis
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/resume_demo.png" alt="Resume Demo — Upload, ATS scoring, and detailed feedback" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/resume_demo.png" alt="Resume demo: PDF upload, ATS scoring, and detailed feedback" width="960" />
 </div>
 
-> Upload a PDF resume and get a 100-point ATS compatibility score with section-by-section breakdown and actionable improvement suggestions.
+> Upload a PDF resume and get a 100-point ATS compatibility score. 65 points are computed
+> deterministically in code (format, structure, achievements, readability), 35 by the model
+> (keywords, grammar), so the same resume gets the same score twice.
 
 <br />
 
-### 🔍 Job Search & Match Strategy
+### Job search and match strategy
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/job_demo_blurred.png" alt="Job Demo — Real-time search and personalized match analysis" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/screenshots/job_demo_blurred.png" alt="Job demo: live web search results and a personalized match analysis" width="960" />
 </div>
 
-> Search for jobs in real-time, then get a personalized match analysis comparing your resume against specific job requirements.
+> Job Scout searches the live web, reports postings as cards (with visa sponsorship
+> flagged), and Match Strategy compares your resume against the posting you pick.
 
 <br />
 
 ## Architecture
 
 <div align="center">
-<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/architecture.svg" alt="Agent Architecture" width="960" />
+<img src="https://raw.githubusercontent.com/chanjoongx/myofferagent/main/public/brand/architecture.svg" alt="Agent architecture diagram" width="960" />
 </div>
 
 <br />
@@ -98,34 +102,39 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 
 | Agent | Description |
 |:------|:------------|
-| **Triage** | Analyzes user intent and routes to the appropriate specialist agent |
-| **Resume Builder** | Builds an ATS-optimized resume step-by-step through conversation |
-| **Resume Analyzer** | Scores your resume on a 100-point ATS compatibility scale with section-level feedback |
-| **Job Scout** | Searches the web in real-time for matching job postings via web search tool |
-| **Match Strategy** | Evaluates fit between your resume and a specific job description |
-| **Application Writer** | Generates tailored cover letters and optimized resume variants |
+| **Triage** | Reads intent and routes to the right specialist. Has no tools of its own |
+| **Resume Builder** | Builds a resume conversationally; every answer is saved to the canonical document through patch tools |
+| **Resume Analyzer** | Imports raw resume text and produces the 100-point ATS score |
+| **Job Scout** | Live web search for postings; reports structured job cards with sponsorship status |
+| **Match Strategy** | Scores resume-to-posting fit: keyword gap, met and unmet skills, concrete edit suggestions |
+| **Application Writer** | Writes a 250-400 word cover letter grounded only in what the resume actually says |
 
 <br />
 
 ## Key Features
 
-**Agent System**
-- 6-agent pipeline with automatic handoff via OpenAI Agents SDK
-- Server-side regex pre-routing + LLM-based triage for fast intent detection
-- Persistent conversation context across agent transitions
+**Agent system**
+- 6-agent pipeline with automatic handoff (OpenAI Agents SDK), SSE streaming from the first token
+- First-turn regex pre-routing skips one LLM round trip when intent is unambiguous; the routing logic is unit-tested against known false positives
+- Conversation continuity via OpenAI response chaining; the resume document itself is client-held, so the server stays stateless
 
-**Resume & Jobs**
-- PDF resume upload with client-side text extraction
-- ATS score visualization with section-by-section breakdown
-- Real-time job search powered by OpenAI web search tool
-- Resume export as Markdown or PDF
+**Resume**
+- PDF text extraction runs entirely in the browser (pdfjs); the file never leaves the device, only extracted text is sent
+- One canonical resume document (zod schema) shared by the agents, the ATS scorer, the live editor panel, and every exporter; limits clamp instead of reject, so partial data survives
+- Server edits merge 3-way with whatever you typed in the editor while the answer was streaming
+- Export as PDF (browser print engine, single-column ATS-safe layout), DOCX, Markdown, or JSON
+
+**Security**
+- Edge rate limiting with Cloudflare's native rate limiting binding (20 requests/min per IP, aggregated globally, not per-isolate)
+- Prompt injection defenses: untrusted text is fenced with marker folding, ATS scoring runs in an isolated model call, and a code-level check rejects rewritten bullets that invent numbers
+- Request caps enforced on real bytes: 1 MB body, 50 messages, 12k chars per message, 60k chars of resume text, 20 agent turns, at most 5 paid web searches per request
+- Strict CSP with no external script or connect origins besides Cloudflare Analytics; markdown images are never rendered (blocks zero-click data exfiltration)
 
 **Interface**
-- Agent sidebar with visual pipeline status and click-to-switch
-- Message copy, retry, and timestamp controls
-- Dark / Light / System theme with auto-detection
-- Korean / English i18n with runtime switching
-- Reduced motion support for accessibility
+- Agent sidebar with live pipeline status; completion checks appear only for agents that actually ran tools
+- Korean / English at runtime, dark / light / system theme, both settled before first paint (no flash)
+- Mobile resume panel is a real modal: focus trap, Escape, focus return, scroll lock
+- IME-aware input: the Enter that commits Korean composition does not send the message
 
 <br />
 
@@ -133,14 +142,33 @@ It's a career assistant where 6 specialized AI agents collaborate to help you la
 
 | Layer | Technology |
 |:------|:-----------|
-| Framework | Next.js 16 (App Router) |
-| Agent SDK | @openai/agents (TypeScript) |
-| LLM | GPT-4o / GPT-4o-mini |
-| Styling | Tailwind CSS v4 (CSS-first `@theme` config) |
+| Framework | Next.js 16 (App Router, webpack build) + React 19 with React Compiler |
+| Agent SDK | @openai/agents 0.6 (TypeScript) |
+| LLM | gpt-5.5 (standard) / gpt-5.4-mini (reserved cost lever), overridable via `OPENAI_MODEL_STANDARD` / `OPENAI_MODEL_FAST` |
+| Styling | Tailwind CSS v4 (CSS-first `@theme`, oklch palette) |
 | Validation | Zod v4 |
-| PDF Parsing | pdfjs-dist v4.9 (CDN, browser-only) |
-| Deployment | Cloudflare Pages via @opennextjs/cloudflare |
-| Compiler | React Compiler (babel-plugin) |
+| PDF parsing | pdfjs-dist 5.x, bundled locally and lazy-loaded in the browser (the CSP blocks CDNs) |
+| Deployment | Cloudflare Workers via @opennextjs/cloudflare + Workers Builds |
+
+<br />
+
+## Verification
+
+`npm run check` runs typecheck, 309 unit tests, and the production build. Because none of
+that exercises the real Workers runtime, `scripts/verify/` adds four harnesses that run
+against a real browser and a real workerd:
+
+| Harness | What it proves |
+|:--------|:---------------|
+| `browser.mjs` | pdfjs loads from our origin (no CDN), CSP holds, a PDF made by our renderer round-trips through our parser, panel edits persist, multi-tab sync, IME Enter guard |
+| `verify-a11y.mjs` | Pinch zoom allowed, theme and language settle before first paint, placeholder contrast is at least 4.5:1, the mobile panel behaves as a true modal |
+| `verify-checkmarks.mjs` | Sidebar completion checks appear only for agents that actually did work |
+| `e2e.mjs` | Full agent scenarios over live SSE: routing, tool calls, resume round-trip, English locale, prompt injection resistance |
+
+```bash
+npm run verify:local   # all four against a local workerd (cf:preview)
+npm run verify:prod    # a11y + e2e against production (calls the real model, costs money)
+```
 
 <br />
 
@@ -181,40 +209,52 @@ The app will be available at `http://localhost:3000`.
 ```
 src/
 ├── app/
-│   ├── page.tsx                # Landing page
-│   ├── agent/page.tsx          # Chat interface
-│   └── api/agent/route.ts      # Agent API endpoint + smart routing
+│   ├── page.tsx                  # Landing page
+│   ├── agent/page.tsx            # Chat app shell
+│   ├── api/agent/route.ts        # SSE endpoint: rate limit, input caps, abort propagation
+│   └── robots.ts, sitemap.ts     # Crawler policy
 ├── lib/
 │   ├── agents/
-│   │   ├── definitions.ts      # 6 agent configs via Agent.create()
-│   │   ├── tools.ts            # parseResume, atsScore, generateResume
-│   │   ├── model-config.ts     # GPT model settings
-│   │   └── constants.ts        # Agent name constants
-│   ├── types.ts                # Shared TypeScript types
-│   ├── i18n.ts                 # Translation dictionary (ko/en)
-│   ├── i18n-context.tsx        # Language provider
-│   └── theme-context.tsx       # Theme provider
-└── components/
-    ├── chat/                   # ChatInterface, MessageBubble, AgentStatusPanel
-    ├── resume/                 # ResumeUploader, ATSScoreCard
-    ├── jobs/                   # JobCard
-    └── ui/                     # Toast
+│   │   ├── definitions.ts        # 6 agents, per-locale instructions, handoff graph
+│   │   ├── routing.ts, intent.ts # First-turn pre-routing (unit-tested)
+│   │   ├── sanitize.ts           # Fencing for untrusted text, linear-time marker folding
+│   │   ├── fabrication.ts        # Rejects invented numbers in bullet rewrites
+│   │   ├── model-config.ts       # Model names, env-overridable
+│   │   ├── openai-client.ts      # Timeouts, retries, schema-repair JSON calls
+│   │   └── tools/                # Resume patch tools, ATS analysis, job/match reporting
+│   ├── resume/
+│   │   ├── schema.ts             # Canonical resume document (zod, clamp not reject)
+│   │   ├── store.ts              # localStorage persistence + cross-tab sync
+│   │   ├── ats.ts                # The deterministic 65 points of the ATS score
+│   │   ├── export.ts             # PDF / DOCX / MD / JSON downloads
+│   │   └── render/               # markdown.ts, print-html.ts, docx.ts
+│   ├── rate-limit.ts             # Cloudflare rate limiting binding, in-memory fallback
+│   ├── i18n.ts                   # ko/en dictionary (parity-tested)
+│   └── types.ts                  # Shared API and domain types
+├── components/
+│   ├── chat/                     # ChatInterface, MessageBubble, AgentStatusPanel
+│   ├── resume/                   # ResumePanel, EditableText, ATSScoreCard
+│   ├── jobs/                     # JobCard
+│   └── ui/                       # Toast
+scripts/
+└── verify/                       # Real-browser and workerd verification harnesses
 ```
 
 <br />
 
 ## Deploy
 
-This project is configured for Cloudflare Pages with the OpenNext adapter.
-See [`wrangler.toml`](wrangler.toml) and [`open-next.config.ts`](open-next.config.ts) for details.
+Pushing to `main` deploys automatically: Cloudflare **Workers Builds** runs the OpenNext
+build and publishes the worker, typically in 2 to 4 minutes. See
+[`wrangler.toml`](wrangler.toml) and [`open-next.config.ts`](open-next.config.ts).
 
 ```bash
-npm run cf:build       # Build
-npm run cf:preview     # Local preview
-npm run cf:deploy      # Deploy
+npm run cf:preview     # local workerd preview at http://localhost:8787
+npm run cf:deploy      # manual deploy, emergency use only (bypasses Workers Builds)
 ```
 
-`OPENAI_API_KEY` must be set as an encrypted environment variable in your deployment platform.
+`OPENAI_API_KEY` must be set as an encrypted variable on the worker
+(`npx wrangler secret put OPENAI_API_KEY`).
 
 <br />
 

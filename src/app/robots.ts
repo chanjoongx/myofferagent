@@ -12,5 +12,6 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ["/"],
       },
     ],
+    sitemap: "https://myofferagent.com/sitemap.xml",
   };
 }

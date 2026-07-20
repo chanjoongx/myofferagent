@@ -42,9 +42,19 @@ export const LIMITS = {
  * 그래서 한도를 **거부가 아니라 절삭(clamp)** 으로 바꿉니다.
  * 데이터를 조금 잃는 것이 전부를 잃는 것보다 언제나 낫습니다. */
 
+/* ── 제어·서식 문자 제거 ──
+ * PDF 추출은 \x0C(폼 피드) 같은 C0 제어 문자를 흘려보내고, 이 값이 그대로
+ * docx 렌더러에 들어가면 XML 1.0이 금지하는 문자라 Word가 파일을 손상으로
+ * 판정합니다. 방향 제어 문자(U+202E 등)는 내보낸 이력서의 표시 순서를
+ * 조작할 수 있습니다. 탭과 줄바꿈만 남기고 걷어냅니다. */
+// eslint-disable-next-line no-control-regex
+const CONTROL_CHARS =
+  /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F\u200B\u200E\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+const stripControls = (s: string) => s.replace(/\r\n?/g, '\n').replace(CONTROL_CHARS, '');
+
 /** 문자열 — 항상 성공. 문자열이 아니면 빈 값, 길면 자른다. */
 const text = (max: number) =>
-  z.unknown().transform((v) => (typeof v === 'string' ? v.trim().slice(0, max) : ''));
+  z.unknown().transform((v) => (typeof v === 'string' ? stripControls(v).trim().slice(0, max) : ''));
 
 /** 문자열 배열 — 항상 성공. 빈 항목 제거 + 개수·길이 절삭. */
 const stringList = (maxItems: number, maxLen: number) =>
@@ -52,7 +62,7 @@ const stringList = (maxItems: number, maxLen: number) =>
     if (!Array.isArray(v)) return [];
     return v
       .filter((s): s is string => typeof s === 'string')
-      .map((s) => s.trim().slice(0, maxLen))
+      .map((s) => stripControls(s).trim().slice(0, maxLen))
       .filter((s) => s.length > 0)
       .slice(0, maxItems);
   });

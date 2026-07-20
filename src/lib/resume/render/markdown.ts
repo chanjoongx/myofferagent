@@ -33,7 +33,10 @@ function link(label: string, url: string): string {
   if (!url) return '';
   // mailto:를 이미 갖춘 값에 https://를 덧붙이지 않도록 스킴 전체를 검사합니다.
   const href = /^(https?:\/\/|mailto:)/i.test(url) ? url : `https://${url}`;
-  return `[${esc(label)}](${href})`;
+  // 괄호·공백이 () 링크 구문을 중간에 끊고 남은 조각을 본문 마크다운으로
+  // 흘려보내지 못하도록 퍼센트 인코딩합니다.
+  const safe = href.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20');
+  return `[${esc(label)}](${safe})`;
 }
 
 export function toMarkdown(doc: ResumeDocument): string {

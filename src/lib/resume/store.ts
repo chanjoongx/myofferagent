@@ -41,12 +41,54 @@ function loadFromStorage(): ResumeDocument {
 function persist(doc: ResumeDocument): void {
   clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
+    saveTimer = undefined; // pagehide 플러시가 "대기 중인 저장이 있는가"를 이 값으로 판단합니다
     try {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(doc));
     } catch {
       // 용량 초과·프라이빗 모드 — 저장 실패는 무시합니다.
     }
   }, SAVE_DEBOUNCE_MS);
+}
+
+/* ── 탭 간 동기화 + 종료 직전 플러시 ──
+ * storage 이벤트는 같은 오리진의 **다른 탭**이 localStorage를 쓸 때만 옵니다.
+ * 구독하지 않으면 탭마다 메모리 사본이 따로 놀다가 마지막에 저장한 탭이
+ * 다른 탭의 편집을 통째로 덮어씁니다. 여기서는 다른 탭의 저장을 즉시
+ * 받아들여(마지막 쓰기 승리) 두 탭이 같은 문서를 보게 합니다.
+ *
+ * pagehide: 디바운스(400ms)가 남은 채로 탭을 닫으면 마지막 편집이 사라지므로
+ * 종료 직전에 즉시 기록합니다. unload가 아니라 pagehide를 쓰는 이유는
+ * unload 리스너가 bfcache를 통째로 비활성화하기 때문입니다. */
+let syncAttached = false;
+function attachTabSync(): void {
+  if (syncAttached || typeof window === 'undefined') return;
+  syncAttached = true;
+
+  window.addEventListener('storage', (e) => {
+    if (e.key !== STORAGE_KEY) return;
+    if (e.newValue === null) {
+      current = emptyResume();
+    } else {
+      try {
+        current = coerceResume(JSON.parse(e.newValue));
+      } catch {
+        return; // 손상된 쓰기는 무시 — 이 탭의 사본을 지킵니다
+      }
+    }
+    // 방금 storage에서 읽었으므로 다시 저장하지 않습니다 (echo 방지)
+    for (const listener of listeners) listener();
+  });
+
+  window.addEventListener('pagehide', () => {
+    if (saveTimer === undefined || current === null) return;
+    clearTimeout(saveTimer);
+    saveTimer = undefined;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
+    } catch {
+      /* 무시 */
+    }
+  });
 }
 
 /** 현재 문서. 최초 호출 시 localStorage에서 한 번만 읽어 캐시합니다. */
@@ -60,6 +102,7 @@ function read(): ResumeDocument {
 /* ── useSyncExternalStore 계약 ── */
 
 export function subscribe(onChange: () => void): () => void {
+  attachTabSync(); // 첫 구독 시 1회 — 구독은 클라이언트에서만 일어납니다
   listeners.add(onChange);
   return () => {
     listeners.delete(onChange);

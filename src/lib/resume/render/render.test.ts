@@ -231,3 +231,31 @@ describe('formatEducationDate — 졸업일 하나만 표기', () => {
     expect(formatEducationDate('Sep 2018', 'Jun 2022', new Date('2025-07-01'))).toBe('Jun 2022');
   });
 });
+
+/* ────────────────────────────────────────────
+   마크다운 링크 URL 인코딩 (2026-07-21 감사에서 추가)
+   ──────────────────────────────────────────── */
+
+describe('markdown link URL escaping', () => {
+  it('URL의 괄호·공백이 링크 구문을 끊고 마크다운을 주입하지 못한다', () => {
+    const doc = coerceResume({
+      basics: { name: 'A' },
+      projects: [
+        { name: 'P', url: 'https://x.com/a) [evil](https://e.vil', bullets: ['b'] },
+      ],
+    });
+    const md = toMarkdown(doc);
+    // 괄호와 공백이 퍼센트 인코딩되어 링크가 한 덩어리로 유지됩니다.
+    expect(md).toContain('(https://x.com/a%29%20[evil]%28https://e.vil)');
+    // 원래 형태의 조기 종결(별도 링크 두 개)이 만들어지지 않습니다.
+    expect(md).not.toContain('(https://x.com/a) [evil]');
+  });
+
+  it('연락처 링크의 공백도 인코딩된다', () => {
+    const doc = coerceResume({
+      basics: { name: 'A', website: 'my site.com/page' },
+    });
+    const md = toMarkdown(doc);
+    expect(md).toContain('https://my%20site.com/page');
+  });
+});

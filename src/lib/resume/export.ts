@@ -46,10 +46,6 @@ export function exportMarkdown(doc: ResumeDocument): void {
   downloadText(toMarkdown(doc), resumeFileName(doc, 'md'), 'text/markdown');
 }
 
-export function exportHtml(doc: ResumeDocument, options?: PrintOptions): void {
-  downloadText(toPrintHtml(doc, options), resumeFileName(doc, 'html'), 'text/html');
-}
-
 /** 정본 JSON — 나중에 다시 불러오거나 백업하는 용도 */
 export function exportJson(doc: ResumeDocument): void {
   downloadText(JSON.stringify(doc, null, 2), resumeFileName(doc, 'json'), 'application/json');

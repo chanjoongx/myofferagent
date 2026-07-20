@@ -1,0 +1,64 @@
+#!/usr/bin/env node
+/**
+ * Cloudflare 배포용 빌드
+ * ------------------------------------------------------------------
+ * `@opennextjs/cloudflare`는 빌드 시점에 `.env*` 파일을 읽어
+ * `.open-next/cloudflare/next-env.mjs`에 **값을 그대로 구워 넣습니다.**
+ * 그래서 로컬에서 그냥 빌드하면 `.env.local`의 실제 API 키가
+ * 배포되는 워커 번들 안에 들어갑니다.
+ *
+ * 런타임 우선순위는 다행히 안전합니다 (`init.js`):
+ *
+ *   for (const [k, v] of Object.entries(env)) process.env[k] = v;  // CF 시크릿 먼저
+ *   process.env[k] ??= nextEnvVars[mode][k];                       // 구워진 값은 폴백
+ *
+ * 즉 `wrangler secret`이 이깁니다. 하지만 그래도 문제가 남습니다:
+ *  - 살아 있는 시크릿이 빌드 산출물에 포함됩니다
+ *  - 시크릿을 지워도 구워진 값이 조용히 이어받아 **키 교체가 불완전**해집니다
+ *
+ * 그래서 배포 빌드에서는 `.env.local`을 잠시 치워 둡니다.
+ * 런타임 값은 전적으로 `wrangler secret put`으로 설정한 시크릿에서 옵니다.
+ */
+
+import { execSync } from 'node:child_process';
+import { existsSync, renameSync, readFileSync } from 'node:fs';
+
+const ENV_LOCAL = '.env.local';
+const STASHED = '.env.local.build-stash';
+
+const hadEnvLocal = existsSync(ENV_LOCAL);
+
+if (hadEnvLocal) {
+  renameSync(ENV_LOCAL, STASHED);
+  console.log(`[cf-build] ${ENV_LOCAL}를 잠시 옮겼습니다 — 시크릿이 번들에 구워지지 않도록.`);
+}
+
+let failed = false;
+try {
+  // 인자를 shell로 넘기지 않도록 단일 명령 문자열을 씁니다 (DEP0190 회피).
+  execSync('npx @opennextjs/cloudflare build', { stdio: 'inherit' });
+} catch {
+  failed = true;
+} finally {
+  if (hadEnvLocal) {
+    renameSync(STASHED, ENV_LOCAL);
+    console.log(`[cf-build] ${ENV_LOCAL} 복원 완료.`);
+  }
+}
+
+if (failed) process.exit(1);
+
+/* ── 검증: 번들에 시크릿이 남아 있지 않은지 확인 ── */
+const generated = '.open-next/cloudflare/next-env.mjs';
+if (existsSync(generated)) {
+  const contents = readFileSync(generated, 'utf8');
+  const leaked = /"(OPENAI_API_KEY|[A-Z_]*(?:KEY|SECRET|TOKEN))":"[^"]{8,}"/.exec(contents);
+  if (leaked) {
+    console.error(
+      `\n[cf-build] 중단: 빌드 산출물에 시크릿이 들어 있습니다 (${leaked[1]}).\n` +
+        `  ${generated}를 확인하세요.`,
+    );
+    process.exit(1);
+  }
+  console.log('[cf-build] 확인 완료 — 번들에 시크릿 없음.');
+}

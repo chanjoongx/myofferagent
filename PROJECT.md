@@ -444,6 +444,25 @@ interface ResumeDocument {
   우리 오리진에서 임의 코드가 실행되고 localStorage의 이력서를 읽을 수 있었습니다.
 - 인쇄용 iframe은 `sandbox="allow-same-origin allow-modals"` — 스크립트 실행 차단.
 
+## 배포
+
+```bash
+npm run cf:deploy    # cf:build → wrangler deploy
+```
+
+⚠️ **`npx @opennextjs/cloudflare build`를 직접 실행하지 마세요.**
+OpenNext는 빌드 시점에 `.env*`를 읽어 `.open-next/cloudflare/next-env.mjs`에
+값을 그대로 구워 넣습니다. 로컬에서 그냥 빌드하면 **실제 API 키가 배포되는
+워커 번들에 포함됩니다.**
+
+런타임 우선순위 자체는 안전합니다 — `init.js`가 Cloudflare 시크릿을 먼저 넣고
+구워진 값은 `??=`로 폴백 처리하므로 `wrangler secret`이 이깁니다. 그래도
+시크릿이 산출물에 남으면 **키를 교체해도 구워진 값이 이어받아** 교체가
+불완전해집니다.
+
+`scripts/cf-build.mjs`가 빌드 동안 `.env.local`을 잠시 치우고, 끝난 뒤
+번들에 시크릿이 없는지 검증합니다. 발견되면 빌드를 실패시킵니다.
+
 ## 검증 방법
 
 ```bash

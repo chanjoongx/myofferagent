@@ -12,7 +12,7 @@
     "test:watch": "vitest",
     "check": "npm run typecheck && npm run test && npm run build",
     "check:models": "node scripts/check-models.mjs",
-    "cf:build": "npx @opennextjs/cloudflare build",
+    "cf:build": "node scripts/cf-build.mjs",
     "cf:preview": "npm run cf:build && npx wrangler dev",
     "cf:deploy": "npm run cf:build && npx wrangler deploy"
   },

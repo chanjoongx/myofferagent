@@ -313,7 +313,12 @@ export async function POST(req: Request): Promise<Response> {
             text ||
             (typeof streamed.finalOutput === 'string'
               ? streamed.finalOutput
-              : JSON.stringify(streamed.finalOutput ?? ''));
+              : // 값이 아예 없으면 빈 문자열 — JSON.stringify(undefined ?? '')는
+                // 리터럴 큰따옴표 두 글자('""')가 되어 말풍선에 그대로 보입니다.
+                // (실측: 검색 차단기가 마지막 요약 생성을 끊은 런에서 발생)
+                streamed.finalOutput == null
+                ? ''
+                : JSON.stringify(streamed.finalOutput));
 
           send({
             type: 'done',

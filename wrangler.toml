@@ -9,6 +9,14 @@ compatibility_flags = ["nodejs_compat"]
 directory = ".open-next/assets"
 binding = "ASSETS"
 
+# ── Workers Logs ──
+# route.ts는 운영 신호를 console.warn/log로 남깁니다 (웹 검색 회로 차단기 발화,
+# report_jobs/report_match 누락, 날조 수치 되돌림, 레이트리미터 폴백 강등).
+# 이 플래그가 없으면 프로덕션에서 그 신호가 전부 버려집니다.
+# 로그 위생은 코드에서 보장합니다 — 이력서 내용은 로그에 싣지 않습니다.
+[observability]
+enabled = true
+
 # Environment variables — set secrets via `npx wrangler secret put OPENAI_API_KEY`
 #
 # Optional model overrides (see src/lib/agents/model-config.ts):

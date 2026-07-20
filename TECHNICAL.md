@@ -372,6 +372,15 @@ auto-deploys** through Cloudflare Workers Builds (typically 2-4 minutes).
 `npm run cf:deploy` exists for emergencies only; using it alongside Workers Builds
 double-deploys.
 
+The Workers Builds build command must stay **`npm run cf:build`** (not the raw
+`npx @opennextjs/cloudflare build`): the wrapper stashes `.env.local` during the
+build and then fails the build if any secret-shaped value is baked into the
+generated `next-env.mjs`. That scan is the deploy-time guard against shipping a
+key inside the bundle. The build environment holds no secrets (the runtime key
+lives only in the worker's own secret store), and a failed build leaves the
+previous deployment serving, silently; check the Builds dashboard or API when a
+push does not go live.
+
 `wrangler.toml`:
 
 - `nodejs_compat` flag, assets binding for static files

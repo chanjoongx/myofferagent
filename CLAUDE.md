@@ -38,6 +38,9 @@ AI 커리어 에이전트 (Next.js 16 + OpenAI Agents SDK, Cloudflare Workers).
 - 배포 확인은 20초 이상 간격의 단일 루프로. 실패가 의심되면 폴링을 늘리지 말고
   Cloudflare Builds API로 빌드 상태·로그를 직접 조회한다 (실측: 빌드 실패는
   프로덕션에 아무 흔적을 남기지 않고, 이전 버전이 조용히 계속 서빙된다).
+- 대시보드의 Workers Builds 빌드 명령은 반드시 `npm run cf:build`
+  (raw `npx @opennextjs/cloudflare build` 금지: 시크릿 베이크 검증 게이트가 빠진다).
+  빌드 환경 변수에는 시크릿을 두지 않는다. 런타임 키는 Worker 시크릿에만 산다.
 
 ### 의존성
 

@@ -3,6 +3,12 @@
 Last verified against the code on 2026-07-21. Where this document and the code
 disagree, the code wins; update this file in the same commit as the change.
 
+Companion documents: [`README.md`](README.md) is the public overview,
+[`PROJECT.md`](PROJECT.md) holds the architecture rules code changes must follow
+(Korean), [`CLAUDE.md`](CLAUDE.md) holds session working rules and environment
+pitfalls (Korean), and [`scripts/verify/README.md`](scripts/verify/README.md)
+explains the harnesses.
+
 ---
 
 ## Table of Contents

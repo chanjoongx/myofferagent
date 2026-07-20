@@ -258,6 +258,17 @@ npm run cf:deploy      # manual deploy, emergency use only (bypasses Workers Bui
 
 <br />
 
+## Documentation
+
+| File | What it covers |
+|:-----|:---------------|
+| [`TECHNICAL.md`](TECHNICAL.md) | Full technical documentation: request lifecycle, agent and tool system, security model, deployment, verification |
+| [`PROJECT.md`](PROJECT.md) | Architecture rules and specs that code changes must follow (reference for AI coding tools, Korean) |
+| [`CLAUDE.md`](CLAUDE.md) | Session working rules: cost and deploy gates, environment pitfalls (Korean) |
+| [`scripts/verify/README.md`](scripts/verify/README.md) | How to run the four verification harnesses (Korean) |
+
+<br />
+
 ## License
 
 This project is licensed under the [MIT License](LICENSE).

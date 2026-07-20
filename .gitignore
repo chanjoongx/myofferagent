@@ -41,6 +41,9 @@ yarn-error.log*
 .open-next/
 .wrangler/
 
+# presentation (local only)
+presentation/
+
 # claude code
 .claude/
 

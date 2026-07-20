@@ -38,5 +38,7 @@ const agentMap: Record<string, typeof triageAgent> = {
  */
 export function getAgentByName(name: string | undefined) {
   if (!name) return triageAgent;
-  return agentMap[name] ?? triageAgent;
+  // `agentMap[name]`만 쓰면 "__proto__"·"constructor" 같은 이름이 프로토타입에서
+  // 무언가를 찾아내 에이전트가 아닌 값을 반환합니다. 자체 속성만 봅니다.
+  return Object.hasOwn(agentMap, name) ? agentMap[name] : triageAgent;
 }

@@ -1,335 +1,359 @@
-// Cloudflare Workers polyfill: enterWith() EXISTS in workerd but throws "not implemented".
-// Override it unconditionally before any SDK import.
+/**
+ * Cloudflare Workers 폴리필
+ * ------------------------------------------------------------------
+ * workerd에는 `AsyncLocalStorage.prototype.enterWith`가 존재하지만 호출하면
+ * "not implemented"를 던집니다. SDK가 이를 호출하므로 무력화가 필요합니다.
+ *
+ * ⚠️ 다만 **무조건** 덮어쓰면 안 됩니다.
+ * 기존 코드는 조건 없이 no-op으로 교체했는데, 이 모듈은 `next build`의
+ * 페이지 데이터 수집 단계에서도 로드됩니다. 그 결과 Next.js 자신의
+ * `workUnitAsyncStorage`가 깨져 빌드가 다음 오류로 실패했습니다:
+ *
+ *   Error [InvariantError]: Invariant: Expected workUnitAsyncStorage to have a store.
+ *   Export encountered an error on /_global-error/page
+ *
+ * 그래서 **실제로 던지는 런타임에서만** 교체합니다.
+ */
 import { AsyncLocalStorage } from 'node:async_hooks';
-AsyncLocalStorage.prototype.enterWith = function () {
-  // no-op: workerd has this method but throws when called
-};
+try {
+  new AsyncLocalStorage<unknown>().enterWith(undefined);
+} catch {
+  AsyncLocalStorage.prototype.enterWith = function () {
+    // no-op: workerd 전용 — Node에서는 이 분기에 들어오지 않습니다
+  };
+}
 
-import { run, RunHandoffOutputItem, RunToolCallOutputItem, setTracingDisabled } from '@openai/agents';
-import { triageAgent, getAgentByName, AGENT_NAMES } from '@/lib/agents';
-import type { AgentRequest, AgentResponse, StructuredData } from '@/lib/types';
+import { run, setTracingDisabled, type AgentInputItem } from '@openai/agents';
 
-// Tracing도 비활성화 (Workers에서 불필요한 trace 수집 방지)
+import { createContext } from '@/lib/agents/context';
+import { routeIntent } from '@/lib/agents/routing';
+import { fence } from '@/lib/agents/sanitize';
+import { coerceResume } from '@/lib/resume/schema';
+import { checkRateLimit } from '@/lib/rate-limit';
+import type {
+  AgentRequest,
+  AgentResponse,
+  AgentStreamEvent,
+  StructuredData,
+} from '@/lib/types';
+
 setTracingDisabled(true);
 
-/* ── 허용 언어 목록 ── */
 const VALID_LANGUAGES = new Set(['ko', 'en']);
-
-/* ── 최소 이력서 길이 (의미 있는 텍스트 기준) ── */
 const MIN_RESUME_LENGTH = 50;
+const MAX_MESSAGES = 50;
+const MAX_BODY_SIZE = 1_000_000;
+const MAX_TURNS = 20;
 
-/* ── 요청 본문 제한 ── */
-const MAX_MESSAGES = 50;         // messages 배열 최대 길이
-const MAX_BODY_SIZE = 500_000;   // 전체 body 최대 크기 (약 500KB)
+/* ── 입력 길이 상한 ──
+ * 컨텍스트 폭주와 비용 증폭을 막습니다. Job Scout은 한 턴에 유료 웹 검색을
+ * 여러 번 호출하므로, 거대한 입력 × 많은 턴 × 분당 20회는 실제 비용 위험입니다. */
+const MAX_RESUME_TEXT = 60_000;
+const MAX_MESSAGE_CHARS = 12_000;
 
-/* ── 서버 사이드 Rate Limiting (인메모리) ──
- * 한계:
- *  - 인메모리 Map은 프로세스별이므로 서버리스(Vercel 등) 환경에서는 인스턴스 간 공유 불가
- *  - x-forwarded-for/x-real-ip 헤더는 CDN/프록시(Vercel, Cloudflare)가 sanitize해야 안전
- *  - 프로덕션에서는 Upstash Redis 기반 @upstash/ratelimit 사용 권장
- */
-const RATE_LIMIT_WINDOW_MS = 60_000;  // 1분 윈도우
-const RATE_LIMIT_MAX = 20;            // 윈도우당 최대 요청 수
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+/* ────────────────────────────────────────────
+   SSE 헬퍼
+   ──────────────────────────────────────────── */
 
-function checkRateLimit(key: string): boolean {
-  const now = Date.now();
-
-  // 만료된 항목 정리 (lazy cleanup)
-  if (rateLimitMap.size > 1000) {
-    for (const [k, v] of rateLimitMap) {
-      if (now > v.resetAt) rateLimitMap.delete(k);
-    }
-  }
-
-  const entry = rateLimitMap.get(key);
-  if (!entry || now > entry.resetAt) {
-    rateLimitMap.set(key, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return false; // 허용
-  }
-
-  entry.count++;
-  return entry.count > RATE_LIMIT_MAX; // true = 차단
+function sseText(event: AgentStreamEvent): string {
+  return `data: ${JSON.stringify(event)}\n\n`;
 }
 
-/**
- * newItems 안의 도구 출력(tool call output)을 순회하며
- * ATS 분석·매칭 분석 JSON이 있으면 structuredData로 추출한다.
- * 마크다운 이력서가 있으면 generatedFiles에 담는다.
- */
-function extractStructuredPayloads(items: Iterable<unknown>) {
-  let structuredData: StructuredData = null;
-  const generatedFiles: Array<{ type: string; content: string; fileName: string }> = [];
+const SSE_HEADERS = {
+  'Content-Type': 'text/event-stream; charset=utf-8',
+  'Cache-Control': 'no-cache, no-transform',
+  Connection: 'keep-alive',
+  // Cloudflare/nginx 버퍼링 비활성화 — 없으면 스트리밍이 무의미해집니다.
+  'X-Accel-Buffering': 'no',
+} as const;
 
-  for (const item of items) {
-    if (!(item instanceof RunToolCallOutputItem)) continue;
-
-    const output = typeof item.output === 'string' ? item.output : JSON.stringify(item.output);
-    const toolName = (item.rawItem as { name?: string }).name ?? '';
-
-    // ATS 점수 결과
-    if (toolName === 'calculate_ats_score' || (!structuredData && output.includes('"overallScore"'))) {
-      try {
-        const parsed = JSON.parse(output);
-        if (parsed.overallScore != null && parsed.sections) {
-          structuredData = { type: 'ats_analysis', data: parsed };
-          console.log('[extract] ATS 분석 데이터 발견');
-        }
-      } catch { /* JSON이 아님 — skip */ }
-    }
-
-    // 이력서 마크다운 생성 결과
-    if (toolName === 'generate_resume_markdown') {
-      const ts = new Date().toISOString().slice(0, 10);
-      generatedFiles.push({
-        type: 'resume_markdown',
-        content: output,
-        fileName: `resume_${ts}.md`,
-      });
-      console.log('[extract] 마크다운 이력서 생성됨');
-    }
-  }
-
-  return { structuredData, generatedFiles };
+function errorResponse(message: string, status: number): Response {
+  // 스트림 시작 전 오류도 SSE 이벤트로 내려보내 클라이언트 처리 경로를 하나로 유지합니다.
+  return new Response(sseText({ type: 'error', message }), { status, headers: SSE_HEADERS });
 }
 
-/**
- * 구조화 데이터(JSON)의 기본 스키마를 검증한다.
- * 잘못된 데이터면 null을 반환해 클라이언트가 깨지지 않게 한다.
- */
-function validateStructuredData(data: StructuredData): StructuredData {
-  if (!data) return null;
+/* ────────────────────────────────────────────
+   POST
+   ──────────────────────────────────────────── */
 
-  if (data.type === 'ats_analysis') {
-    const d = data.data;
-    if (
-      typeof d?.overallScore !== 'number' ||
-      d.overallScore < 0 ||
-      d.overallScore > 100 ||
-      typeof d?.sections !== 'object' ||
-      !d.sections
-    ) {
-      console.error('[validate] ATS 데이터 형식 불일치 — 무시');
-      return null;
-    }
-  }
-
-  if (data.type === 'match_analysis') {
-    const d = data.data;
-    if (
-      typeof d?.matchScore !== 'number' ||
-      d.matchScore < 0 ||
-      d.matchScore > 100
-    ) {
-      console.error('[validate] Match 데이터 형식 불일치 — 무시');
-      return null;
-    }
-  }
-
-  return data;
-}
-
-export async function POST(req: Request) {
-  // ── 서버 사이드 Rate Limiting ──
+export async function POST(req: Request): Promise<Response> {
   const clientIp =
+    // Cloudflare가 엣지에서 덮어쓰므로 위조 불가. 아래 두 개는 비-CF 호스팅용 폴백입니다.
+    req.headers.get('cf-connecting-ip') ||
     req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
     req.headers.get('x-real-ip') ||
     'unknown';
 
-  if (checkRateLimit(clientIp)) {
-    return Response.json(
-      { output: '', activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: 'Too many requests' } satisfies AgentResponse,
-      { status: 429 },
-    );
-  }
-
-  // 언어를 catch 블록에서도 참조하기 위해 try 바깥에 선언
   let language: 'ko' | 'en' = 'ko';
 
   try {
-    // ── 요청 본문 크기 제한 ──
-    const contentLength = Number(req.headers.get('content-length') ?? 0);
-    if (contentLength > MAX_BODY_SIZE) {
-      return Response.json(
-        { output: '', activeAgent: AGENT_NAMES.TRIAGE, structuredData: null, error: 'Request body too large' } satisfies AgentResponse,
-        { status: 413 },
-      );
+    if (await checkRateLimit(clientIp)) {
+      return errorResponse('Too many requests', 429);
     }
 
-    const body: AgentRequest = await req.json();
-
-    // ── messages 배열 길이 제한 ──
-    if (body.messages && body.messages.length > MAX_MESSAGES) {
-      body.messages = body.messages.slice(-MAX_MESSAGES);
+    /* ── 본문 크기 ──
+     * content-length 헤더만 믿으면 안 됩니다. Transfer-Encoding: chunked면
+     * 헤더가 아예 없어서 `Number(null ?? 0)` → 0 → 검사를 그냥 통과합니다.
+     * 실제로 읽은 바이트 수로 판정합니다. */
+    const raw = await req.arrayBuffer();
+    if (raw.byteLength > MAX_BODY_SIZE) {
+      return errorResponse('Request body too large', 413);
     }
 
-    // ── 언어 파라미터 검증 ──
+    let body: AgentRequest;
+    try {
+      body = JSON.parse(new TextDecoder().decode(raw)) as AgentRequest;
+    } catch {
+      return errorResponse('Malformed JSON', 400);
+    }
+
+    /* ── 메시지 배열 검증 ──
+     * 원소가 객체이고 content가 문자열인지까지 확인합니다.
+     * (null 원소 하나로 아래 join이 throw하던 문제) */
+    if (!Array.isArray(body.messages)) {
+      return errorResponse('messages must be an array', 400);
+    }
+    const messages = body.messages
+      .filter(
+        (m): m is { role: 'user' | 'assistant'; content: string } =>
+          !!m && typeof m === 'object' && typeof m.content === 'string',
+      )
+      .slice(-MAX_MESSAGES)
+      .map((m) => ({
+        role: m.role === 'assistant' ? ('assistant' as const) : ('user' as const),
+        content: m.content.slice(0, MAX_MESSAGE_CHARS),
+      }));
+
     language = body.language && VALID_LANGUAGES.has(body.language) ? body.language : 'ko';
 
-    // ── 이력서 텍스트 검증 ──
     const resumeText =
-      body.resumeText && body.resumeText.trim().length >= MIN_RESUME_LENGTH
-        ? body.resumeText.trim()
+      typeof body.resumeText === 'string' && body.resumeText.trim().length >= MIN_RESUME_LENGTH
+        ? body.resumeText.trim().slice(0, MAX_RESUME_TEXT)
         : null;
 
-    if (body.resumeText && !resumeText) {
-      console.log('[POST /api/agent] 이력서 텍스트가 너무 짧아 무시됨');
-    }
+    /* ── 실행 컨텍스트 ──
+     * 이력서 정본은 클라이언트가 보관하고 매 턴 되돌려 보냅니다.
+     * 사용자가 편집 패널에서 고친 내용도 이 경로로 에이전트에게 전달됩니다. */
+    /* 취소 신호는 컨텍스트에 실려 도구까지 전달됩니다 —
+     * 도구가 직접 OpenAI를 호출하므로 여기서 끊지 않으면 중지가 무의미합니다. */
+    const abort = new AbortController();
+    // 이미 중단된 시그널에는 'abort' 이벤트가 **다시 발생하지 않습니다.**
+    // 클라이언트가 rate-limit 조회나 본문 읽기 도중에 끊으면, 리스너만 달고
+    // 실행은 끝까지 돌아 유료 웹 검색까지 태웠습니다.
+    if (req.signal.aborted) abort.abort();
+    else req.signal.addEventListener('abort', () => abort.abort(), { once: true });
 
-    // ── 시작 에이전트 결정 ──
-    let startAgent = body.activeAgentName
-      ? getAgentByName(body.activeAgentName)
-      : triageAgent;
+    const ctx = createContext({
+      resume: coerceResume(body.resumeDoc),
+      locale: language,
+      signal: abort.signal,
+    });
 
-    // ── 스마트 라우팅: 사용자 의도 기반 라우팅 보정 ──
-    // LLM(Triage Agent)보다 먼저 서버에서 명확한 의도를 감지하여 올바른 에이전트로 직접 보냄
-    const lastMsg = body.messages.filter(m => m.role === 'user').pop()?.content ?? '';
-    const wantsSearch = /채용|공고|검색|찾아|잡|인턴|구직|search|find.*job|job.*search|hiring/i.test(lastMsg);
-    const wantsBuild = /이력서.{0,4}(만들|작성|써|쓰|생성|없|시작)|resume.{0,4}(create|build|make|write|start)/i.test(lastMsg);
-    const wantsAnalyze = /이력서.{0,4}(분석|검토|평가|봐|점수)|ats.{0,4}(분석|점수|score)|resume.{0,4}(analy|review|check)/i.test(lastMsg);
-    const hasResumeContent = lastMsg.includes('[이력서 내용]');
+    /* ── 시작 에이전트 결정 ── */
+    const lastUserMessage = messages.filter((m) => m.role === 'user').pop()?.content ?? '';
+    const startAgent = routeIntent({
+      message: lastUserMessage,
+      activeAgentName: body.activeAgentName,
+      hasSession: !!body.lastResponseId,
+      hasResumeText: !!resumeText,
+    });
 
-    // Job Scout에서 사용자가 공고를 선택/분석 요청 → Match Strategy로 전환
-    // 확장된 정규식: "3번", "3번 공고", "3번째", "첫번째", "#3", "analyze job 3" 등
-    const wantsJobAnalysis = /(\d{1,2})\s*(번|번째|번\s*공고|번\s*회사|번\s*으로)|(\d{1,2})\s*(분석|선택|지원|매칭|할게|줘|요|해|볼래|골라|보자|좋아|선택할게|알아봐)|(분석|선택|지원|매칭).*(\d{1,2})|(첫|두|세|네|다섯)\s*번째|(analyze|select|pick|choose|option|number|job|#)\s*(\d{1,2})|(\d{1,2})\s*(analyze|select|pick|choose)/i.test(lastMsg);
-    // Scout 상태에서 단순 숫자 입력 ("3", "#2", "1번" 등) → 공고 선택으로 간주
-    const isBareJobSelection = body.activeAgentName === AGENT_NAMES.SCOUT && /^\s*#?\d+\s*번?\s*$/.test(lastMsg.trim());
-    // 커버레터/자기소개서 요청 감지
-    const wantsCoverLetter = /커버\s*레터|자기\s*소개서|cover\s*letter|motivation\s*letter/i.test(lastMsg);
+    /* ── 모델 입력 구성 ──
+     * 세션이 이어지는 중이면 마지막 사용자 메시지만 보냅니다.
+     * (이전 맥락은 previousResponseId로 서버 측에 이미 남아 있습니다.)
+     * 새 대화면 역할을 보존한 아이템 배열로 보냅니다 — 예전에는 content만
+     * 이어 붙여서 어시스턴트의 환영 인사까지 사용자 발화처럼 취급됐습니다. */
+    const turnMessages = body.lastResponseId
+      ? [{ role: 'user' as const, content: lastUserMessage }]
+      : messages;
 
-    if (body.activeAgentName && body.lastResponseId) {
-      // Job Scout에서 공고 선택 → Match Strategy
-      if (body.activeAgentName === AGENT_NAMES.SCOUT && (wantsJobAnalysis || isBareJobSelection)) {
-        startAgent = getAgentByName(AGENT_NAMES.MATCH);
-        console.log('[POST /api/agent] 라우팅 보정(기존 세션): Job Scout → Match Strategy');
-      }
-      // 커버레터 요청 → Application Writer로 보정
-      if (wantsCoverLetter && body.activeAgentName !== AGENT_NAMES.WRITER) {
-        startAgent = getAgentByName(AGENT_NAMES.WRITER);
-        console.log('[POST /api/agent] 라우팅 보정(기존 세션): → Application Writer');
-      }
-      // 검색 불가능한 에이전트에서 검색 요청 → Job Scout로 보정
-      const cannotSearchSet = new Set<string>([AGENT_NAMES.MATCH, AGENT_NAMES.WRITER, AGENT_NAMES.ANALYZER, AGENT_NAMES.BUILDER]);
-      const cannotSearch = !!body.activeAgentName && cannotSearchSet.has(body.activeAgentName);
-      if (wantsSearch && cannotSearch) {
-        startAgent = getAgentByName(AGENT_NAMES.SCOUT);
-        console.log('[POST /api/agent] 라우팅 보정(기존 세션): → Job Scout');
-      }
-    } else if (!body.lastResponseId) {
-      // 첫 메시지: 명확한 의도가 감지되면 Triage를 건너뛰고 바로 해당 에이전트로
-      if (wantsCoverLetter) {
-        startAgent = getAgentByName(AGENT_NAMES.WRITER);
-        console.log('[POST /api/agent] 라우팅 보정(첫 메시지): → Application Writer');
-      } else if (wantsSearch) {
-        startAgent = getAgentByName(AGENT_NAMES.SCOUT);
-        console.log('[POST /api/agent] 라우팅 보정(첫 메시지): → Job Scout');
-      } else if (hasResumeContent || wantsAnalyze) {
-        startAgent = getAgentByName(AGENT_NAMES.ANALYZER);
-        console.log('[POST /api/agent] 라우팅 보정(첫 메시지): → Resume Analyzer');
-      } else if (wantsBuild) {
-        startAgent = getAgentByName(AGENT_NAMES.BUILDER);
-        console.log('[POST /api/agent] 라우팅 보정(첫 메시지): → Resume Builder');
-      }
-    }
-
-    // ── 입력 구성 ──
-    let input: string;
-
-    if (body.lastResponseId) {
-      const lastUserMsg = body.messages.filter(m => m.role === 'user').pop();
-      input = lastUserMsg?.content ?? '';
-    } else {
-      input = body.messages.map((m) => m.content).join('\n');
+    if (turnMessages.length === 0 || !turnMessages.some((m) => m.content.trim())) {
+      return errorResponse('Empty input', 400);
     }
 
     if (resumeText) {
-      input += '\n\n[이력서 내용]\n' + resumeText;
+      // 데이터 안의 울타리 마커를 제거한 뒤 감쌉니다 (sanitize.fence 참고).
+      const last = turnMessages[turnMessages.length - 1];
+      turnMessages[turnMessages.length - 1] = {
+        ...last,
+        content: `${last.content}\n\n${fence('RESUME_TEXT', resumeText, { maxLength: MAX_RESUME_TEXT })}`,
+      };
     }
 
-    // ── 언어 설정 ──
-    if (language === 'en') {
-      input = `⚠️ CRITICAL LANGUAGE OVERRIDE: You MUST respond ENTIRELY in English. This overrides ALL other language instructions including "한국어로 대화하세요". Every word of your response — greetings, explanations, analysis, suggestions, formatting, questions — must be in English. Do NOT use Korean at all.\n\n${input}`;
-    }
-
-    console.log(
-      `[POST /api/agent] session=${body.sessionId}, agent=${startAgent.name}, ` +
-      `hasResponseId=${!!body.lastResponseId}, inputLen=${input.length}`
+    // SDK가 요구하는 아이템 형태로 변환 (assistant는 status와 타입이 붙은 content 필요)
+    const inputItems: AgentInputItem[] = turnMessages.map((m) =>
+      m.role === 'assistant'
+        ? {
+            role: 'assistant' as const,
+            status: 'completed' as const,
+            content: [{ type: 'output_text' as const, text: m.content }],
+          }
+        : { role: 'user' as const, content: m.content },
     );
 
-    // ── 에이전트 실행 (대화 체인 연결) ──
-    const result = await run(startAgent, input, {
+    console.log(
+      `[POST /api/agent] session=${body.sessionId} agent=${startAgent.name} ` +
+        `chained=${!!body.lastResponseId} items=${inputItems.length} locale=${language}`,
+    );
+
+    /* ── 스트리밍 실행 ──
+     * `signal`을 넘겨야 사용자가 중지를 눌렀을 때 에이전트 루프와 OpenAI 요청이
+     * 실제로 끊깁니다. 없으면 화면만 멈추고 서버는 끝까지 돌며 토큰을 태웁니다. */
+    const streamed = await run(startAgent, inputItems, {
+      context: ctx,
+      stream: true,
+      maxTurns: MAX_TURNS,
+      signal: abort.signal,
       ...(body.lastResponseId ? { previousResponseId: body.lastResponseId } : {}),
     });
 
-    // ── 활성 에이전트 추적 ──
-    // 핸드오프가 있었으면 마지막 핸드오프 대상이 활성 에이전트
-    let activeAgent = startAgent.name;
-    for (const item of result.newItems) {
-      if (item instanceof RunHandoffOutputItem) {
-        activeAgent = item.targetAgent?.name ?? activeAgent;
-      }
-    }
-
-    // ── finalOutput 문자열화 ──
-    const rawOutput =
-      typeof result.finalOutput === 'string'
-        ? result.finalOutput
-        : JSON.stringify(result.finalOutput);
-
-    // ── 도구 결과에서 구조화 데이터 & 생성 파일 추출 ──
-    const { structuredData, generatedFiles } = extractStructuredPayloads(result.newItems);
-
-    // finalOutput 자체가 JSON일 수도 있으니 fallback 체크
-    let finalStructured: StructuredData = structuredData;
-    if (!finalStructured) {
-      try {
-        const parsed = JSON.parse(rawOutput);
-        if (parsed?.overallScore != null && parsed?.sections) {
-          finalStructured = { type: 'ats_analysis', data: parsed };
-        } else if (parsed?.matchScore != null) {
-          finalStructured = { type: 'match_analysis', data: parsed };
-        }
-      } catch {
-        // 일반 텍스트 — structuredData 없음
-      }
-    }
-
-    // ── 구조화 데이터 검증 ──
-    finalStructured = validateStructuredData(finalStructured);
-
-    // ── lastResponseId 추출 ──
-    // @openai/agents의 RunResult에 런타임으로 lastResponseId가 존재 — 안전한 타입 체크
-    const lastResponseId = (() => {
-      const val = (result as unknown as Record<string, unknown>).lastResponseId;
-      return typeof val === 'string' ? val : undefined;
-    })();
-
-    const response: AgentResponse = {
-      output: rawOutput,
-      activeAgent,
-      structuredData: finalStructured,
-      ...(lastResponseId ? { lastResponseId } : {}),
-      ...(generatedFiles.length > 0 ? { generatedFiles } : {}),
+    /** 이번 실행에서 도구가 만들어 낸 구조화 데이터를 모두 모은다 */
+    const collectStructured = (): StructuredData[] => {
+      const out: StructuredData[] = [];
+      if (ctx.emitted.jobs) out.push({ type: 'job_results', data: ctx.emitted.jobs });
+      if (ctx.emitted.match) out.push({ type: 'match_analysis', data: ctx.emitted.match });
+      if (ctx.emitted.ats) out.push({ type: 'ats_analysis', data: ctx.emitted.ats });
+      return out;
     };
 
-    console.log(
-      `[POST /api/agent] 완료 — agent=${activeAgent}, ` +
-      `structured=${finalStructured?.type ?? 'none'}, ` +
-      `files=${generatedFiles.length}, ` +
-      `responseId=${lastResponseId ? lastResponseId.slice(0, 20) + '...' : 'none'}`
-    );
-    return Response.json(response);
+    const encoderStream = new ReadableStream<Uint8Array>({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        // 클라이언트가 연결을 끊은 뒤 enqueue/close하면 TypeError가 납니다.
+        // 중지 버튼을 누를 때마다 unhandled rejection이 나던 원인입니다.
+        let closed = false;
+        const send = (e: AgentStreamEvent) => {
+          if (closed) return;
+          try {
+            controller.enqueue(encoder.encode(sseText(e)));
+          } catch {
+            closed = true;
+          }
+        };
+
+        let activeAgent: string = startAgent.name;
+        let text = '';
+
+        try {
+          send({ type: 'agent', name: activeAgent });
+
+          for await (const event of streamed) {
+            switch (event.type) {
+              case 'agent_updated_stream_event': {
+                // handoff 발생 시점을 실시간으로 알 수 있습니다.
+                const name = event.agent?.name;
+                if (name && name !== activeAgent) {
+                  activeAgent = name;
+                  send({ type: 'agent', name });
+                }
+                break;
+              }
+
+              case 'run_item_stream_event': {
+                if (event.name === 'tool_called') {
+                  const rawItem = event.item.rawItem as { name?: string };
+                  send({ type: 'tool_start', tool: rawItem?.name ?? 'tool' });
+                } else if (event.name === 'tool_output') {
+                  const rawItem = event.item.rawItem as { name?: string };
+                  send({ type: 'tool_end', tool: rawItem?.name ?? 'tool' });
+                }
+                break;
+              }
+
+              case 'raw_model_stream_event': {
+                const data = event.data as { type?: string; delta?: string };
+                if (data.type === 'output_text_delta' && data.delta) {
+                  text += data.delta;
+                  send({ type: 'delta', text: data.delta });
+                }
+                break;
+              }
+            }
+          }
+
+          await streamed.completed;
+
+          const finalOutput =
+            text ||
+            (typeof streamed.finalOutput === 'string'
+              ? streamed.finalOutput
+              : JSON.stringify(streamed.finalOutput ?? ''));
+
+          send({
+            type: 'done',
+            payload: {
+              output: finalOutput,
+              activeAgent: streamed.currentAgent?.name ?? activeAgent,
+              structuredData: collectStructured(),
+              ...(ctx.resumeTouched ? { resumeDoc: ctx.resume } : {}),
+              ...(streamed.lastResponseId ? { lastResponseId: streamed.lastResponseId } : {}),
+            } satisfies AgentResponse,
+          });
+
+          /* ── 리포트 도구 누락 감지 ──
+           * `report_jobs` / `report_match`는 프롬프트로만 강제됩니다. 모델이
+           * 건너뛰면 사용자에게는 카드가 하나도 안 보이는데, 이전에는 그 사실을
+           * 아무도 알아채지 못했습니다(조용한 품질 저하). 최소한 로그로 남깁니다. */
+          const finalAgent = streamed.currentAgent?.name ?? activeAgent;
+          if (finalAgent === 'Job Scout' && !ctx.emitted.jobs) {
+            console.warn('[POST /api/agent] Job Scout이 report_jobs를 호출하지 않음 — 공고 카드 없음');
+          }
+          if (finalAgent === 'Match Strategy' && !ctx.emitted.match) {
+            console.warn('[POST /api/agent] Match Strategy가 report_match를 호출하지 않음 — 매칭 카드 없음');
+          }
+
+          console.log(
+            `[POST /api/agent] 완료 agent=${activeAgent} ` +
+              `structured=${collectStructured().length} ` +
+              `resumeTouched=${ctx.resumeTouched} outLen=${finalOutput.length}`,
+          );
+        } catch (err) {
+          // 객체 전체를 찍으면 SDK 오류가 요청 조각(이력서 내용 포함)을 흘릴 수 있습니다.
+          const name = err instanceof Error ? err.name : 'Error';
+          const detail = err instanceof Error ? err.message.slice(0, 300) : '';
+          console.error(`[POST /api/agent] 스트림 오류: ${name} — ${detail}`);
+
+          /* ⚠️ 오류가 나도 이력서 변경분은 반드시 돌려보냅니다.
+           * 예전에는 error 이벤트만 보내서, maxTurns 초과나 모델 5xx가 나면
+           * 그 실행에서 도구가 저장한 이력서 편집이 통째로 사라졌습니다. */
+          if (ctx.resumeTouched) {
+            send({ type: 'resume', doc: ctx.resume });
+          }
+          send({
+            type: 'error',
+            message:
+              language === 'en'
+                ? 'An unexpected error occurred. Please try again.'
+                : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.',
+          });
+        } finally {
+          if (!closed) {
+            closed = true;
+            try {
+              controller.close();
+            } catch {
+              /* 이미 닫힘 */
+            }
+          }
+        }
+      },
+
+      cancel() {
+        // 클라이언트가 연결을 끊음 — 진행 중인 에이전트 실행을 실제로 중단시킵니다.
+        abort.abort();
+        console.log('[POST /api/agent] 클라이언트가 스트림을 취소했습니다');
+      },
+    });
+
+    return new Response(encoderStream, { headers: SSE_HEADERS });
   } catch (err) {
-    console.error('[POST /api/agent] 에러:', err);
-
-    // 클라이언트 언어에 맞춰 에러 메시지 반환
-    const fallbackMsg = language === 'en'
-      ? 'An unexpected error occurred. Please try again.'
-      : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.';
-
-    return Response.json(
-      { output: fallbackMsg, activeAgent: AGENT_NAMES.TRIAGE, structuredData: null } satisfies AgentResponse,
-      { status: 500 },
+    const name = err instanceof Error ? err.name : 'Error';
+    console.error(`[POST /api/agent] 오류: ${name}`);
+    return errorResponse(
+      language === 'en'
+        ? 'An unexpected error occurred. Please try again.'
+        : '알 수 없는 오류가 발생했습니다. 다시 시도해 주세요.',
+      500,
     );
   }
 }

@@ -10,3 +10,17 @@ directory = ".open-next/assets"
 binding = "ASSETS"
 
 # Environment variables — set secrets via `npx wrangler secret put OPENAI_API_KEY`
+#
+# Optional model overrides (see src/lib/agents/model-config.ts):
+#   npx wrangler secret put OPENAI_MODEL_STANDARD
+#   npx wrangler secret put OPENAI_MODEL_FAST
+
+# ── Rate limiting ──
+# 엣지에서 전역 집계되는 네이티브 레이트 리미터.
+# 이 바인딩이 없으면 src/lib/rate-limit.ts가 인메모리 방식으로 강등되는데,
+# Workers에서는 isolate마다 카운터가 따로 있어 사실상 무력합니다.
+[[unsafe.bindings]]
+name = "RATE_LIMITER"
+type = "ratelimit"
+namespace_id = "1001"
+simple = { limit = 20, period = 60 }

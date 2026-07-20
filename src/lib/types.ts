@@ -1,29 +1,67 @@
 // ===== My Offer Agent — 공유 타입 정의 =====
 // API 요청/응답 + 도메인 모델. 프론트·백 양쪽에서 import.
 
+import type { ResumeDocument } from './resume/schema';
+
 // ---------- API 요청 ----------
 export interface AgentRequest {
   messages: Array<{ role: 'user' | 'assistant'; content: string }>;
   sessionId: string;
   resumeText?: string;        // 프론트에서 PDF 텍스트 추출 후 전달
+  /**
+   * 클라이언트가 보관 중인 이력서 정본.
+   * 서버는 무상태이므로, 매 턴 클라이언트가 되돌려 보내고 서버가 패치해 되돌려줍니다.
+   * (사용자가 편집 패널에서 고친 내용도 이 경로로 에이전트에게 전달됩니다.)
+   */
+  resumeDoc?: ResumeDocument;
   lastResponseId?: string;    // 이전 턴의 OpenAI response ID (대화 체인용)
   activeAgentName?: string;   // 현재 활성 에이전트 이름 (다음 턴 시작점)
   language?: 'ko' | 'en';    // 응답 언어 설정
 }
 
-// ---------- API 응답 ----------
+// ---------- API 응답 (스트림 종료 시 'done' 이벤트로 전달) ----------
 export interface AgentResponse {
   output: string;
   activeAgent: string;
-  structuredData: StructuredData;
+  /**
+   * 이번 턴에 도구가 만들어 낸 구조화 데이터 **전부**.
+   * 배열인 이유: Scout → Match 핸드오프가 한 번의 실행에서 일어나면
+   * 공고 목록과 매칭 분석이 동시에 나옵니다. 단수였을 때는 한쪽이 조용히 버려졌습니다.
+   */
+  structuredData: StructuredData[];
+  /** 이번 턴에 이력서가 바뀐 경우에만 포함 */
+  resumeDoc?: ResumeDocument;
   lastResponseId?: string;    // 이 턴의 response ID → 프론트가 다음 요청에 돌려보냄
-  generatedFiles?: Array<{
-    type: string;
-    content: string;
-    fileName: string;
-  }>;
   error?: string;             // 서버 에러 시 에러 메시지
 }
+
+// ---------- SSE 스트림 이벤트 ----------
+/**
+ * `/api/agent`는 SSE로 응답합니다. 각 줄은 `data: <JSON>\n\n` 형식이며
+ * 페이로드는 아래 유니온 중 하나입니다.
+ *
+ * 기존에는 전체 실행이 끝날 때까지 기다렸다가 한 번에 JSON을 돌려줬습니다.
+ * Job Scout가 웹 검색을 2~3회 수행하면 30~60초 동안 화면에는
+ * 점 세 개만 튀는 상태였습니다.
+ */
+export type AgentStreamEvent =
+  /** 활성 에이전트가 바뀜 (handoff 포함) */
+  | { type: 'agent'; name: string }
+  /** 도구 실행 시작 — 진행 상황 표시용 */
+  | { type: 'tool_start'; tool: string }
+  /** 도구 실행 완료 */
+  | { type: 'tool_end'; tool: string }
+  /** 응답 텍스트 조각 */
+  | { type: 'delta'; text: string }
+  /**
+   * 이력서 변경분. 정상 종료 시에는 'done'에 실려 오지만,
+   * **오류로 끝나는 경우에도** 편집분이 유실되지 않도록 별도로 먼저 보냅니다.
+   */
+  | { type: 'resume'; doc: ResumeDocument }
+  /** 실행 완료 — 최종 페이로드 */
+  | { type: 'done'; payload: AgentResponse }
+  /** 복구 불가능한 오류 */
+  | { type: 'error'; message: string };
 
 // 구조화된 데이터 — discriminated union
 export type StructuredData =
@@ -95,37 +133,7 @@ export interface JobSearchResult {
 }
 
 // ---------- 파싱된 이력서 ----------
-export interface ParsedResume {
-  contactInfo: {
-    name: string;
-    email: string;
-    phone?: string;
-    linkedin?: string;
-    github?: string;
-  };
-  education: Array<{
-    school: string;
-    degree: string;
-    major: string;
-    gpa?: string;
-    date: string;
-  }>;
-  experience: Array<{
-    company: string;
-    title: string;
-    start: string;
-    end: string;
-    bullets: string[];
-  }>;
-  projects: Array<{
-    name: string;
-    tech: string[];
-    bullets: string[];
-  }>;
-  skills: {
-    languages: string[];
-    frameworks: string[];
-    tools: string[];
-  };
-  targetRole?: string;
-}
+// 이전의 느슨한 `ParsedResume`는 `lib/resume/schema.ts`의 `ResumeDocument`로
+// 대체되었습니다. 그쪽이 Zod 스키마이자 정본이며, 리스트 항목에 id가 있어
+// 부분 수정이 가능합니다.
+export type { ResumeDocument } from './resume/schema';

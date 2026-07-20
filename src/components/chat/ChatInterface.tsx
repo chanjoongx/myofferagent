@@ -9,38 +9,48 @@ import {
   type KeyboardEvent,
   type ChangeEvent,
 } from "react";
-import { Paperclip, ArrowUp, FileText, X, Download, Printer, RotateCcw } from "lucide-react";
+import { Paperclip, ArrowUp, FileText, X, RotateCcw, Square, PanelRight } from "lucide-react";
 import MessageBubble from "./MessageBubble";
 import AgentStatusPanel from "./AgentStatusPanel";
 import ATSScoreCard from "@/components/resume/ATSScoreCard";
+import ResumePanel from "@/components/resume/ResumePanel";
 import JobCard from "@/components/jobs/JobCard";
 import { extractTextFromPDF, preloadPdfJs } from "@/components/pdf-loader";
 import { useLanguage } from "@/lib/i18n-context";
 import { useToast } from "@/components/ui/Toast";
+import { useResume } from "@/lib/resume/use-resume";
+import { streamAgent } from "@/lib/agent-client";
 import { AGENT_NAMES } from "@/lib/agents/constants";
-import type {
-  AgentResponse,
-  StructuredData,
-  MatchAnalysis,
-} from "@/lib/types";
+import type { StructuredData, MatchAnalysis } from "@/lib/types";
+import type { ResumeDocument } from "@/lib/resume/schema";
 
 /* ── 타입 ──────────────────────────────────── */
 
-interface GeneratedFile {
-  type: string;
-  content: string;
-  fileName: string;
-}
-
 interface ChatMessage {
+  /**
+   * 안정적인 식별자.
+   *
+   * 스트리밍 대상 말풍선을 "배열의 마지막 요소"로 찾으면 안 됩니다.
+   * 핸드오프가 일어나면 그 사이에 시스템 메시지가 배열 끝에 추가되어
+   * 이후 델타가 전부 엉뚱한 곳을 향하거나 통째로 버려집니다.
+   * (실제로 PDF 첨부 시 첫 프레임이 곧바로 에이전트 전환이라
+   *  응답이 한 글자도 표시되지 않는 버그가 있었습니다.)
+   */
+  id: string;
   role: "user" | "assistant" | "system";
   content: string;
   agentName?: string;
-  structuredData?: StructuredData;
-  generatedFiles?: GeneratedFile[];
+  structuredData?: StructuredData[];
   attachedFileName?: string;
   timestamp?: number;
   isError?: boolean;
+  /** 스트리밍 중 — 커서 표시용 */
+  streaming?: boolean;
+}
+
+let messageSeq = 0;
+function nextMessageId(): string {
+  return `m${++messageSeq}`;
 }
 
 function generateSessionId() {
@@ -137,9 +147,7 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
                 className="rounded-lg bg-surface/60 border border-surface-border p-3 text-xs space-y-1"
               >
                 <span className="font-medium text-accent">{edit.section}</span>
-                <p className="text-text-secondary line-through">
-                  {edit.original}
-                </p>
+                <p className="text-text-secondary line-through">{edit.original}</p>
                 <p className="text-text-primary">{edit.suggested}</p>
                 <p className="text-text-secondary italic">{edit.reason}</p>
               </div>
@@ -147,143 +155,6 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ── 다운로드 헬퍼 ─────────────────────────── */
-
-function downloadAsFile(content: string, fileName: string, mimeType: string) {
-  const blob = new Blob([content], { type: mimeType });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fileName;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function extractResumeContent(content: string): string | null {
-  const codeBlock = content.match(/```(?:markdown|md)?\n([\s\S]*?)```/);
-  if (codeBlock) return codeBlock[1].trim();
-  const resumeHeaders = ["## Education", "## Experience", "## Skills", "## Projects"];
-  const hasResumeStructure = resumeHeaders.filter((h) => content.includes(h)).length >= 2;
-  if (hasResumeStructure) return content.trim();
-  return null;
-}
-
-/* ── 마크다운 → HTML 변환 (이력서 인쇄용, 경량) ── */
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function markdownToHtml(md: string): string {
-  // Strip any raw HTML tags before markdown processing
-  const sanitized = md.replace(/<[^>]*>/g, '');
-  return sanitized
-    .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-    .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/^- (.+)$/gm, '<li>$1</li>')
-    .replace(/(<li>.*<\/li>\n?)+/g, (m) => `<ul>${m}</ul>`)
-    .replace(/^---$/gm, '<hr/>')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, url) => {
-      try {
-        const u = new URL(url);
-        if (u.protocol === 'http:' || u.protocol === 'https:') {
-          return `<a href="${escapeHtml(url)}">${escapeHtml(text)}</a>`;
-        }
-      } catch { /* invalid URL */ }
-      return escapeHtml(text);
-    })
-    .replace(/^(?!<[hulo]|<li|<hr)(.*\S.*)$/gm, '<p>$1</p>')
-    .replace(/\n{2,}/g, '\n');
-}
-
-function printResumeAsPdf(markdownContent: string) {
-  const html = markdownToHtml(markdownContent);
-  const win = window.open('', '_blank');
-  if (!win) return;
-
-  win.document.write(`<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Resume</title>
-<style>
-  @page { margin: 0.7in 0.8in; size: letter; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Georgia', 'Times New Roman', serif; font-size: 11pt; line-height: 1.45; color: #1a1a1a; }
-  h1 { font-size: 18pt; margin-bottom: 4pt; }
-  h2 { font-size: 12pt; border-bottom: 1px solid #333; padding-bottom: 2pt; margin: 14pt 0 6pt; text-transform: uppercase; letter-spacing: 0.5pt; }
-  h3 { font-size: 11pt; margin: 8pt 0 2pt; }
-  p { margin: 2pt 0; }
-  ul { margin: 2pt 0 2pt 18pt; }
-  li { margin: 1pt 0; }
-  hr { border: none; border-top: 1px solid #ccc; margin: 8pt 0; }
-  a { color: #1a1a1a; text-decoration: none; }
-  strong { font-weight: 700; }
-  @media print { body { -webkit-print-color-adjust: exact; } }
-</style>
-</head><body>${html}</body></html>`);
-  win.document.close();
-  setTimeout(() => { win.print(); win.onafterprint = () => win.close(); }, 300);
-}
-
-/* ── 파일 다운로드 블록 ────────────────────── */
-
-function GeneratedFilesBlock({ files }: { files: GeneratedFile[] }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {files.map((f) => (
-        <div key={f.fileName} className="flex gap-1.5">
-          <button
-            onClick={() => downloadAsFile(f.content, f.fileName, "text/plain;charset=utf-8")}
-            className="inline-flex items-center gap-2 rounded-xl border border-surface-border bg-surface-elevated px-3.5 py-2 text-xs transition-colors hover:border-accent/40 hover:bg-accent/5"
-          >
-            <Download className="h-3.5 w-3.5 text-accent" />
-            <span className="font-medium">{f.fileName}</span>
-          </button>
-          {f.type === "resume_markdown" && (
-            <button
-              onClick={() => printResumeAsPdf(f.content)}
-              className="inline-flex items-center gap-2 rounded-xl border border-surface-border bg-surface-elevated px-3.5 py-2 text-xs transition-colors hover:border-accent/40 hover:bg-accent/5"
-            >
-              <Printer className="h-3.5 w-3.5 text-accent" />
-              <span className="font-medium">PDF</span>
-            </button>
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function MarkdownDownloadButton({ label, content }: { label: string; content: string }) {
-  const resumeContent = extractResumeContent(content);
-  if (!resumeContent) return null;
-  const timestamp = new Date().toISOString().slice(0, 10);
-
-  return (
-    <div className="flex gap-2">
-      <button
-        onClick={() => downloadAsFile(resumeContent, `resume_${timestamp}.md`, "text/markdown;charset=utf-8")}
-        className="inline-flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-3.5 py-2 text-xs text-accent transition-colors hover:bg-accent/10"
-      >
-        <Download className="h-3.5 w-3.5" />
-        <span className="font-medium">{label}</span>
-      </button>
-      <button
-        onClick={() => printResumeAsPdf(resumeContent)}
-        className="inline-flex items-center gap-2 rounded-xl border border-accent/30 bg-accent/5 px-3.5 py-2 text-xs text-accent transition-colors hover:bg-accent/10"
-      >
-        <Printer className="h-3.5 w-3.5" />
-        <span className="font-medium">PDF</span>
-      </button>
     </div>
   );
 }
@@ -310,30 +181,49 @@ function StructuredDataBlock({ data }: { data: StructuredData }) {
   }
 }
 
+/* ── 도구 이름 → 상태 문구 ─────────────────── */
+
+function toolStatusKey(tool: string): string {
+  if (tool.includes("search")) return "status.searching";
+  if (tool.includes("ats")) return "status.analyzing";
+  if (tool.includes("import")) return "status.importing";
+  if (/^(set_|upsert_|remove_|improve_)/.test(tool)) return "status.writing";
+  return "status.working";
+}
+
 /* ── 상수 ─────────────────────────────────── */
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_TEXTAREA_HEIGHT = 160;
-const MAX_RENDERED_MESSAGES = 100;       // 렌더링할 최대 메시지 수
-const SEND_COOLDOWN_MS = 1_500;          // 전송 간 최소 간격 (레이트 리미팅)
+const MAX_RENDERED_MESSAGES = 100;
+const SEND_COOLDOWN_MS = 1_000;
 
 /* ── 메인 컴포넌트 ─────────────────────────── */
 
 export default function ChatInterface() {
   const { locale, t } = useLanguage();
   const { toast } = useToast();
+  const resume = useResume();
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentAgent, setCurrentAgent] = useState<string>(AGENT_NAMES.TRIAGE);
   const [completedAgents, setCompletedAgents] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [statusKey, setStatusKey] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [resumeText, setResumeText] = useState<string | null>(null);
   const [attachedFile, setAttachedFile] = useState<string | null>(null);
   const [lastResponseId, setLastResponseId] = useState<string | null>(null);
-
   const [keyboardOpen, setKeyboardOpen] = useState(false);
+  const [panelOpen, setPanelOpen] = useState(false);
 
+  const currentAgentRef = useRef<string>(AGENT_NAMES.TRIAGE);
+  /** 지금 스트리밍 중인 assistant 말풍선의 id */
+  const streamingIdRef = useRef<string | null>(null);
+  /** 마지막으로 보낸 내용 — 재시도가 첨부 파일까지 그대로 복원하도록 보관 */
+  const lastSendRef = useRef<{ text: string; resumeText: string | null; fileName: string | null } | null>(null);
+  /** 요청을 보낼 때의 이력서 — 응답을 3-way 병합할 기준점 */
+  const sentDocRef = useRef<ResumeDocument | null>(null);
   const sessionIdRef = useRef(generateSessionId());
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -344,30 +234,51 @@ export default function ChatInterface() {
   const resizeRafRef = useRef<number>(0);
   const fullHeightRef = useRef(0);
 
-  // 언마운트 시 진행 중인 요청 취소
+  /* 스트리밍 델타 버퍼 —
+     토큰마다 setState하면 ReactMarkdown이 매번 재파싱되어 버벅입니다.
+     ref에 모았다가 애니메이션 프레임마다 한 번씩 반영합니다. */
+  const deltaBufferRef = useRef("");
+  const flushRafRef = useRef<number>(0);
+
+  /**
+   * 스트리밍 상태를 완전히 정리한다.
+   *
+   * 버퍼를 비우지 않으면 **이전 턴의 텍스트가 다음 턴에 새어 나옵니다.**
+   * (중지 직후 남아 있던 rAF가 뒤늦게 실행되거나, 백그라운드 탭에서 rAF가
+   *  지연됐다가 새 턴이 시작된 뒤에 발화하는 경우)
+   */
+  const endStreaming = useCallback(() => {
+    cancelAnimationFrame(flushRafRef.current);
+    deltaBufferRef.current = "";
+    streamingIdRef.current = null;
+  }, []);
+
+  /** 대화 리셋 시 에이전트를 Triage로 되돌린다 (ref까지 함께 갱신) */
+  const resetAgent = useCallback(() => {
+    currentAgentRef.current = AGENT_NAMES.TRIAGE;
+    setCurrentAgent(AGENT_NAMES.TRIAGE);
+    setCompletedAgents([]);
+  }, []);
+
   useEffect(() => {
     return () => {
       abortControllerRef.current?.abort();
       cancelAnimationFrame(resizeRafRef.current);
+      cancelAnimationFrame(flushRafRef.current);
     };
   }, []);
 
-  // PDF.js 프리로드 — 브라우저 idle 시점에 백그라운드 로딩
   useEffect(() => {
     preloadPdfJs();
   }, []);
 
-  // 모바일 키보드 뷰포트 대응
-  // --vh CSS 변수를 visualViewport.height / 100 으로 갱신
-  // 이렇게 하면 .app-shell { height: calc(var(--vh) * 100) } 가
-  // 키보드 열림/닫힘에 따라 자동으로 줄어들고 늘어남
+  // 모바일 키보드 뷰포트 대응 (--vh 갱신)
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
 
     let rafId = 0;
     let prevHeight = 0;
-    // 초기 전체 높이 기록 (키보드 열림 판단 기준)
     fullHeightRef.current = vv.height;
 
     const syncVh = () => {
@@ -375,23 +286,13 @@ export default function ChatInterface() {
       if (h === prevHeight) return;
       prevHeight = h;
 
-      // 전체 높이 갱신 (키보드 닫혔을 때의 높이를 추적)
-      if (h > fullHeightRef.current) {
-        fullHeightRef.current = h;
-      }
-
-      // 키보드 열림 판단: 뷰포트가 전체의 75% 이하로 줄어들면 키보드가 열린 것
-      const isKbOpen = h < fullHeightRef.current * 0.75;
-      setKeyboardOpen(isKbOpen);
+      if (h > fullHeightRef.current) fullHeightRef.current = h;
+      setKeyboardOpen(h < fullHeightRef.current * 0.75);
 
       cancelAnimationFrame(rafId);
       rafId = requestAnimationFrame(() => {
         document.documentElement.style.setProperty("--vh", `${h * 0.01}px`);
-
-        if (vv.offsetTop > 0) {
-          window.scrollTo(0, 0);
-        }
-
+        if (vv.offsetTop > 0) window.scrollTo(0, 0);
         scrollRef.current?.scrollTo({
           top: scrollRef.current.scrollHeight,
           behavior: "instant",
@@ -411,13 +312,12 @@ export default function ChatInterface() {
     };
   }, []);
 
-  // 로케일 변경 시 전체 대화 리셋 (이전 대화는 다른 언어이므로)
+  // 로케일 변경 시 대화 리셋 (이력서 정본은 언어와 무관하므로 유지)
   useEffect(() => {
     if (prevLocaleRef.current !== locale) {
       prevLocaleRef.current = locale;
       sessionIdRef.current = generateSessionId();
-      setCurrentAgent(AGENT_NAMES.TRIAGE);
-      setCompletedAgents([]);
+      resetAgent();
       setLastResponseId(null);
       setResumeText(null);
       setAttachedFile(null);
@@ -426,16 +326,16 @@ export default function ChatInterface() {
 
     setMessages([
       {
+        id: nextMessageId(),
         role: "assistant",
         content: t("chat.welcome"),
         agentName: AGENT_NAMES.TRIAGE,
       },
     ]);
-  }, [locale, t]);
+  }, [locale, t, resetAgent]);
 
-  // 자동 스크롤 — 레이아웃 완료 후 실행
+  // 자동 스크롤
   useEffect(() => {
-    // 두 프레임 대기: 1프레임(DOM 갱신) + 1프레임(레이아웃 반영)
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({
@@ -447,62 +347,63 @@ export default function ChatInterface() {
     return () => cancelAnimationFrame(id);
   }, [messages, isLoading]);
 
-  // 메시지 가상화 — 최근 N개만 렌더링 (성능 최적화)
   const visibleMessages = useMemo(() => {
     if (messages.length <= MAX_RENDERED_MESSAGES) return messages;
     return messages.slice(-MAX_RENDERED_MESSAGES);
   }, [messages]);
 
-  // assistant 메시지에서 이력서 마크다운 존재 여부를 캐시 (매 렌더링마다 regex 반복 실행 방지)
-  const resumeContentMap = useMemo(() => {
-    const map = new Map<number, string | null>();
-    visibleMessages.forEach((msg, idx) => {
-      if (msg.role === "assistant" && !msg.generatedFiles) {
-        map.set(idx, extractResumeContent(msg.content));
-      }
-    });
-    return map;
-  }, [visibleMessages]);
-
+  /**
+   * 활성 에이전트 전환.
+   *
+   * 비교 기준을 state가 아니라 **ref**로 둡니다. 한 번의 스트림에서 핸드오프가
+   * 연달아 일어날 수 있는데(Triage → Scout → Match), state는 다음 렌더까지
+   * 갱신되지 않아 두 번째 전환이 낡은 값과 비교됩니다.
+   * ref는 동기적으로 갱신되므로 연속 전환이 정확히 처리됩니다.
+   *
+   * (setState 업데이터 안에서 다른 setState를 호출하면 안 됩니다 —
+   *  업데이터는 순수해야 하고 React가 두 번 호출할 수 있어 시스템 메시지가
+   *  중복 삽입됩니다.)
+   */
   const handleAgentSwitch = useCallback(
     (newAgent: string) => {
-      if (newAgent !== currentAgent) {
-        setCompletedAgents((prev) =>
-          prev.includes(currentAgent) ? prev : [...prev, currentAgent]
-        );
-        setMessages((prev) => [
-          ...prev,
-          { role: "system", content: t("chat.agentSwitch", { agent: newAgent }) },
-        ]);
-        setCurrentAgent(newAgent);
-      }
+      const prev = currentAgentRef.current;
+      if (newAgent === prev) return;
+      currentAgentRef.current = newAgent;
+
+      setCompletedAgents((done) => (done.includes(prev) ? done : [...done, prev]));
+      setMessages((msgs) => [
+        ...msgs,
+        { id: nextMessageId(), role: "system", content: t("chat.agentSwitch", { agent: newAgent }) },
+      ]);
+      setCurrentAgent(newAgent);
     },
-    [currentAgent, t]
+    [t],
   );
 
-  /** 사이드바 클릭으로 수동 에이전트 전환 — lastResponseId를 리셋하여 새 대화 시작 */
+
   const handleManualAgentSwitch = useCallback(
     (targetAgent: string) => {
       if (targetAgent === currentAgent || isLoading) return;
       setLastResponseId(null);
       handleAgentSwitch(targetAgent);
     },
-    [currentAgent, isLoading, handleAgentSwitch]
+    [currentAgent, isLoading, handleAgentSwitch],
   );
 
-  /** 새 대화 시작 — 모든 상태 초기화 */
   const handleNewConversation = useCallback(() => {
-    if (isLoading) return;
     abortControllerRef.current?.abort();
+    endStreaming();
     sessionIdRef.current = generateSessionId();
-    setCurrentAgent(AGENT_NAMES.TRIAGE);
-    setCompletedAgents([]);
+    resetAgent();
     setLastResponseId(null);
     setResumeText(null);
     setAttachedFile(null);
     setInput("");
+    setIsLoading(false);
+    setStatusKey(null);
     setMessages([
       {
+        id: nextMessageId(),
         role: "assistant",
         content: t("chat.welcome"),
         agentName: AGENT_NAMES.TRIAGE,
@@ -510,133 +411,227 @@ export default function ChatInterface() {
       },
     ]);
     requestAnimationFrame(() => textareaRef.current?.focus());
-  }, [isLoading, t]);
+  }, [t, resetAgent, endStreaming]);
 
-  const sendMessage = useCallback(async () => {
-    const trimmed = input.trim();
-    const hasResume = !!resumeText;
-    if ((!trimmed && !hasResume) || isLoading) return;
+  /** 진행 중인 응답 중단 */
+  const handleStop = useCallback(() => {
+    abortControllerRef.current?.abort();
+    setIsLoading(false);
+    setStatusKey(null);
+    const id = streamingIdRef.current;
+    endStreaming();
+    if (id) setMessages((prev) => prev.map((m) => (m.id === id ? { ...m, streaming: false } : m)));
+  }, [endStreaming]);
 
-    // 클라이언트 레이트 리미팅 — 연속 빠른 전송 방지
-    const now = Date.now();
-    if (now - lastSendTimeRef.current < SEND_COOLDOWN_MS) {
-      return;
-    }
-    lastSendTimeRef.current = now;
+  /** id로 메시지를 찾아 수정한다 — 위치에 의존하지 않습니다 */
+  const updateMessage = useCallback(
+    (id: string, patch: (m: ChatMessage) => ChatMessage) => {
+      setMessages((prev) => prev.map((m) => (m.id === id ? patch(m) : m)));
+    },
+    [],
+  );
 
-    const messageText = trimmed || t("chat.analyzeAuto");
+  /** 버퍼에 쌓인 델타를 스트리밍 중인 말풍선에 반영 */
+  const flushDeltas = useCallback(() => {
+    const id = streamingIdRef.current;
+    const chunk = deltaBufferRef.current;
+    // 버퍼는 대상 유무와 관계없이 항상 비웁니다 — 남겨 두면 다음 턴에 붙습니다.
+    deltaBufferRef.current = "";
+    if (!chunk || !id) return;
+    updateMessage(id, (m) => ({ ...m, content: m.content + chunk }));
+  }, [updateMessage]);
 
-    const userMsg: ChatMessage = {
-      role: "user",
-      content: messageText,
-      timestamp: Date.now(),
-      ...(attachedFile ? { attachedFileName: attachedFile } : {}),
-    };
-    setMessages((prev) => [...prev, userMsg]);
-    setInput("");
-    setIsLoading(true);
+  const send = useCallback(
+    async (
+      text: string,
+      attachedResumeText: string | null,
+      fileName: string | null,
+      /**
+       * 재시도 시 사용할 대화 이력.
+       *
+       * `setMessages`는 비동기라, 재시도가 실패한 메시지를 지운 직후 `send`를
+       * 호출하면 `send`는 **지우기 전 배열**을 봅니다. 그래서 같은 사용자 메시지가
+       * 모델에게 두 번 전달됐습니다. 정리된 배열을 명시적으로 넘겨 해결합니다.
+       */
+      historyOverride?: ChatMessage[],
+    ) => {
+      const now = Date.now();
+      lastSendTimeRef.current = now;
+      lastSendRef.current = { text, resumeText: attachedResumeText, fileName };
+      endStreaming();
 
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+      const userMsg: ChatMessage = {
+        id: nextMessageId(),
+        role: "user",
+        content: text,
+        timestamp: now,
+        ...(fileName ? { attachedFileName: fileName } : {}),
+      };
 
-    const capturedResumeText = resumeText;
-    setAttachedFile(null);
-    setResumeText(null);
+      // 사용자 메시지 + 빈 assistant 메시지(스트리밍 대상)를 함께 추가
+      const baseMessages = historyOverride ?? messages;
+      const history = [...baseMessages, userMsg]
+        .filter((m) => m.role !== "system")
+        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content }));
 
-    try {
-      // 이전 요청이 진행 중이면 취소
+      const assistantId = nextMessageId();
+      streamingIdRef.current = assistantId;
+      setMessages((prev) => [
+        ...(historyOverride ?? prev),
+        userMsg,
+        { id: assistantId, role: "assistant", content: "", agentName: currentAgent, streaming: true },
+      ]);
+      setIsLoading(true);
+      setStatusKey("status.thinking");
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+
       abortControllerRef.current?.abort();
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      const apiMessages = [...messages, userMsg]
-        .filter((m) => m.role !== "system")
-        .map((m) => ({
-          role: m.role as "user" | "assistant",
-          content: m.content,
-        }));
+      // 병합 기준점을 고정합니다 (이후 사용자가 패널에서 고쳐도 이 값은 그대로).
+      const sentDoc = resume.doc;
+      sentDocRef.current = sentDoc;
 
-      const res = await fetch("/api/agent", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        signal: controller.signal,
-        body: JSON.stringify({
-          messages: apiMessages,
-          sessionId: sessionIdRef.current,
-          ...(capturedResumeText ? { resumeText: capturedResumeText } : {}),
-          ...(lastResponseId ? { lastResponseId } : {}),
-          ...(currentAgent ? { activeAgentName: currentAgent } : {}),
-          language: locale,
-        }),
-      });
+      try {
+        await streamAgent(
+          {
+            messages: history,
+            sessionId: sessionIdRef.current,
+            resumeDoc: resume.doc,
+            ...(attachedResumeText ? { resumeText: attachedResumeText } : {}),
+            ...(lastResponseId ? { lastResponseId } : {}),
+            ...(currentAgent ? { activeAgentName: currentAgent } : {}),
+            language: locale,
+          },
+          {
+            onAgent: (name) => {
+              handleAgentSwitch(name);
+              updateMessage(assistantId, (m) => ({ ...m, agentName: name }));
+            },
 
-      if (!res.ok) throw new Error(`API ${res.status}`);
+            onTool: (tool, phase) => {
+              setStatusKey(phase === "start" ? toolStatusKey(tool) : "status.thinking");
+            },
 
-      const json: AgentResponse = await res.json();
+            onResume: (doc) => {
+              // 오류로 끝나도 이력서 편집분은 살립니다.
+              resume.applyServerDoc(sentDoc, doc);
+              setPanelOpen(true);
+            },
 
-      if (json.lastResponseId) {
-        setLastResponseId(json.lastResponseId);
+            onDelta: (chunk) => {
+              deltaBufferRef.current += chunk;
+              cancelAnimationFrame(flushRafRef.current);
+              flushRafRef.current = requestAnimationFrame(flushDeltas);
+            },
+
+            onDone: (payload) => {
+              cancelAnimationFrame(flushRafRef.current);
+              flushDeltas();
+              streamingIdRef.current = null;
+
+              if (payload.lastResponseId) setLastResponseId(payload.lastResponseId);
+              // 서버가 이력서를 수정했으면 반영 (사용자 편집분과 병합된 최신본)
+              if (payload.resumeDoc) {
+                // 응답을 기다리는 20~40초 사이에 사용자가 패널에서 고친 내용을
+                // 서버 응답이 덮어쓰지 않도록 3-way 병합합니다.
+                resume.applyServerDoc(sentDoc, payload.resumeDoc);
+                setPanelOpen(true);
+              }
+
+              updateMessage(assistantId, (m) => ({
+                ...m,
+                // 델타가 하나도 안 온 경우(도구만 실행) 최종 출력으로 대체
+                content: m.content || payload.output,
+                agentName: payload.activeAgent,
+                structuredData: payload.structuredData?.length ? payload.structuredData : undefined,
+                timestamp: Date.now(),
+                streaming: false,
+              }));
+            },
+
+            onError: (rawMessage) => {
+              const message =
+                rawMessage === 'STREAM_TRUNCATED' ? t('chat.error') : rawMessage;
+              endStreaming();
+              setMessages((prev) => [
+                // 내용이 하나도 없는 빈 말풍선은 제거하고, 부분 응답은 남깁니다.
+                ...prev.filter((m) => !(m.id === assistantId && !m.content)),
+                { id: nextMessageId(), role: "system", content: message, isError: true },
+              ]);
+            },
+          },
+          controller.signal,
+        );
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error(err);
+        setMessages((prev) => [
+          ...prev.filter((m) => !(m.id === assistantId && !m.content)),
+          { id: nextMessageId(), role: "system", content: t("chat.error"), isError: true },
+        ]);
+      } finally {
+        setIsLoading(false);
+        setStatusKey(null);
+        requestAnimationFrame(() => textareaRef.current?.focus());
       }
+    },
+    [messages, currentAgent, lastResponseId, locale, t, resume, handleAgentSwitch, flushDeltas, updateMessage, endStreaming],
+  );
 
-      if (json.activeAgent !== currentAgent) {
-        handleAgentSwitch(json.activeAgent);
-      }
+  const sendMessage = useCallback(() => {
+    const trimmed = input.trim();
+    if ((!trimmed && !resumeText) || isLoading) return;
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: json.output,
-          agentName: json.activeAgent,
-          timestamp: Date.now(),
-          structuredData: json.structuredData ?? undefined,
-          generatedFiles:
-            json.generatedFiles && json.generatedFiles.length > 0
-              ? json.generatedFiles
-              : undefined,
-        },
-      ]);
-    } catch (err) {
-      // AbortError는 의도적 취소이므로 에러 메시지 표시하지 않음
-      if (err instanceof DOMException && err.name === 'AbortError') return;
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: "system", content: t("chat.error"), isError: true },
-      ]);
-    } finally {
-      setIsLoading(false);
-      requestAnimationFrame(() => textareaRef.current?.focus());
-    }
-  }, [input, isLoading, messages, currentAgent, resumeText, attachedFile, lastResponseId, locale, t, handleAgentSwitch]);
+    // 쿨다운은 입력창을 비우기 **전에** 확인합니다.
+    // (예전에는 send() 안에서 조용히 return 해서, 연속 전송 시 메시지와
+    //  첨부한 PDF가 아무 안내 없이 사라졌습니다.)
+    if (Date.now() - lastSendTimeRef.current < SEND_COOLDOWN_MS) return;
 
-  /** 에러 발생 시 마지막 유저 메시지를 재전송 */
+    const text = trimmed || t("chat.analyzeAuto");
+    const captured = resumeText;
+    const file = attachedFile;
+
+    setInput("");
+    setAttachedFile(null);
+    setResumeText(null);
+
+    void send(text, captured, file);
+  }, [input, resumeText, attachedFile, isLoading, t, send]);
+
+  /**
+   * 직전 전송을 그대로 재현한다.
+   *
+   * 예전에는 마지막 사용자 메시지를 찾아 `send()`에 넘겼는데, `send()`가 사용자
+   * 말풍선을 다시 추가하므로 **같은 메시지가 두 번** 보였고, 첨부했던 이력서
+   * 텍스트는 `null`로 넘겨서 영영 사라졌습니다.
+   * 이제 원본 인자를 보관해 두었다가 실패한 말풍선만 지우고 replay합니다.
+   */
   const handleRetry = useCallback(() => {
     if (isLoading) return;
-    // 마지막 에러 시스템 메시지 제거, 마지막 유저 메시지 찾기
-    setMessages((prev) => {
-      const cleaned = prev.filter((m, i) => !(i === prev.length - 1 && m.isError));
-      return cleaned;
-    });
-    // 마지막 유저 메시지의 content를 input에 넣고 재전송
-    const lastUserMsg = messages.filter((m) => m.role === "user").pop();
-    if (lastUserMsg) {
-      setInput(lastUserMsg.content);
-      // 다음 틱에서 sendMessage 호출 (input state 반영 후)
-      requestAnimationFrame(() => {
-        const sendBtn = document.querySelector<HTMLButtonElement>('[aria-label="' + t("chat.send") + '"]');
-        sendBtn?.click();
-      });
-    }
-  }, [isLoading, messages, t]);
+    const prevSend = lastSendRef.current;
+    if (!prevSend) return;
+
+    /* 실패한 교환을 통째로 잘라냅니다.
+     * 마지막 사용자 메시지까지 되짚어 올라가 그 지점부터 버립니다 —
+     * 부분 응답이 남아 있어도 확실히 제거됩니다.
+     * (이전 구현은 내용이 있는 assistant 말풍선을 만나면 멈춰서 사용자
+     *  메시지를 남겼고, 결과적으로 같은 메시지가 두 번 보였습니다.) */
+    const lastUserIdx = messages.map((m) => m.role).lastIndexOf("user");
+    const cleaned = lastUserIdx >= 0 ? messages.slice(0, lastUserIdx) : messages;
+
+    setMessages(cleaned);
+    void send(prevSend.text, prevSend.resumeText, prevSend.fileName, cleaned);
+  }, [isLoading, messages, send]);
 
   const onKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      if (input.trim() || resumeText) sendMessage();
+      sendMessage();
     }
   };
 
-  // Textarea 리사이즈를 rAF로 디바운스 — 매 키 입력마다 reflow 방지
   const handleTextareaChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     setInput(e.target.value);
     cancelAnimationFrame(resizeRafRef.current);
@@ -671,8 +666,12 @@ export default function ChatInterface() {
 
   return (
     <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-      {/* Sidebar — 모바일에서 키보드 열리면 숨김 */}
-      <aside className={`w-full shrink-0 md:w-60 lg:w-64 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass ${keyboardOpen ? "hidden md:block" : ""}`}>
+      {/* ── 사이드바 ── */}
+      <aside
+        className={`w-full shrink-0 md:w-56 lg:w-60 overflow-y-auto border-b md:border-b-0 md:border-r border-surface-border glass ${
+          keyboardOpen ? "hidden md:block" : ""
+        }`}
+      >
         <AgentStatusPanel
           currentAgent={currentAgent}
           completedAgents={completedAgents}
@@ -682,9 +681,8 @@ export default function ChatInterface() {
         />
       </aside>
 
-      {/* Chat Area — 체인 전체에 min-h-0 + overflow-hidden */}
+      {/* ── 채팅 영역 ── */}
       <div className="flex flex-1 flex-col min-w-0 min-h-0 overflow-hidden">
-        {/* Messages — flex-1 + min-h-0으로 스크롤 활성화 */}
         <div
           ref={scrollRef}
           role="log"
@@ -692,7 +690,6 @@ export default function ChatInterface() {
           aria-label={t("chat.messageList")}
           className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-4 custom-scrollbar"
         >
-          {/* 메시지 수 초과 시 안내 */}
           {messages.length > MAX_RENDERED_MESSAGES && (
             <div className="flex justify-center py-2">
               <span className="text-[11px] text-text-secondary/60">
@@ -703,9 +700,8 @@ export default function ChatInterface() {
             </div>
           )}
 
-          {visibleMessages.map((msg, idx) => (
-            <div key={idx} className="space-y-3">
-              {/* Attachment card */}
+          {visibleMessages.map((msg) => (
+            <div key={msg.id} className="space-y-3">
               {msg.attachedFileName && msg.role === "user" && (
                 <div className="flex justify-end">
                   <div className="inline-flex items-center gap-2.5 rounded-2xl rounded-br-md bg-accent/8 border border-accent/20 px-4 py-2.5">
@@ -722,22 +718,24 @@ export default function ChatInterface() {
                 </div>
               )}
 
-              {/* Structured data (score card etc.) BEFORE text */}
-              {msg.structuredData && (
-                <div className="max-w-[90%] sm:max-w-[80%]">
-                  <StructuredDataBlock data={msg.structuredData} />
+              {msg.structuredData?.map((sd, i) => (
+                <div key={i} className="max-w-[90%] sm:max-w-[80%]">
+                  <StructuredDataBlock data={sd} />
                 </div>
+              ))}
+
+              {/* 내용이 있거나, 스트리밍 중이 아닌 메시지만 렌더 */}
+              {(msg.content || !msg.streaming) && (
+                <MessageBubble
+                  role={msg.role}
+                  content={msg.content}
+                  agentName={msg.agentName}
+                  isSystem={msg.role === "system"}
+                  timestamp={msg.timestamp}
+                  streaming={msg.streaming}
+                />
               )}
 
-              <MessageBubble
-                role={msg.role}
-                content={msg.content}
-                agentName={msg.agentName}
-                isSystem={msg.role === "system"}
-                timestamp={msg.timestamp}
-              />
-
-              {/* 에러 시 재시도 버튼 */}
               {msg.isError && (
                 <div className="flex justify-center">
                   <button
@@ -750,37 +748,25 @@ export default function ChatInterface() {
                   </button>
                 </div>
               )}
-
-              {msg.generatedFiles && (
-                <div className="max-w-[90%] sm:max-w-[80%]">
-                  <GeneratedFilesBlock files={msg.generatedFiles} />
-                </div>
-              )}
-              {msg.role === "assistant" && !msg.generatedFiles && resumeContentMap.get(idx) && (
-                <div className="max-w-[90%] sm:max-w-[80%]">
-                  <MarkdownDownloadButton
-                    label={t("chat.downloadResume")}
-                    content={msg.content}
-                  />
-                </div>
-              )}
             </div>
           ))}
 
-          {isLoading && (
-            <div className="flex justify-start" role="status" aria-label={t("chat.loading")}>
-              <div className="rounded-2xl rounded-bl-md bg-surface-elevated border border-surface-border px-5 py-3.5">
-                <div className="flex gap-1">
-                  <span className="h-1.5 w-1.5 rounded-full bg-text-secondary/60 animate-bounce" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-text-secondary/60 animate-bounce [animation-delay:150ms]" />
-                  <span className="h-1.5 w-1.5 rounded-full bg-text-secondary/60 animate-bounce [animation-delay:300ms]" />
-                </div>
+          {/* 진행 상태 — 어떤 작업 중인지 알려줍니다 */}
+          {isLoading && statusKey && (
+            <div className="flex justify-start" role="status">
+              <div className="inline-flex items-center gap-2 rounded-full border border-surface-border bg-surface-elevated px-3.5 py-1.5">
+                <span className="flex gap-1">
+                  <span className="h-1 w-1 rounded-full bg-accent/70 animate-bounce" />
+                  <span className="h-1 w-1 rounded-full bg-accent/70 animate-bounce [animation-delay:150ms]" />
+                  <span className="h-1 w-1 rounded-full bg-accent/70 animate-bounce [animation-delay:300ms]" />
+                </span>
+                <span className="text-[11px] text-text-secondary">{t(statusKey)}</span>
               </div>
             </div>
           )}
         </div>
 
-        {/* Input area — shrink-0으로 고정, safe-area 패딩 적용 */}
+        {/* ── 입력 영역 ── */}
         <div className="shrink-0 border-t border-surface-border bg-surface/80 backdrop-blur px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           {attachedFile && (
             <div className="mb-2 inline-flex items-center gap-2 rounded-lg bg-accent/8 border border-accent/20 px-3 py-1.5 text-xs text-accent">
@@ -802,7 +788,7 @@ export default function ChatInterface() {
           <div className="flex items-end gap-2">
             <button
               onClick={() => fileInputRef.current?.click()}
-              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary hover:border-accent/30 active:bg-surface-elevated"
+              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:bg-surface-elevated hover:text-text-primary hover:border-accent/30"
               title={t("chat.pdfTooltip")}
               aria-label={t("chat.pdfTooltip")}
             >
@@ -827,17 +813,76 @@ export default function ChatInterface() {
               className="flex-1 resize-none rounded-xl border border-surface-border bg-surface-elevated px-4 py-2.5 text-base sm:text-sm text-text-primary placeholder:text-text-secondary/50 outline-none transition-colors focus:border-accent/40 focus:ring-1 focus:ring-accent/20"
             />
 
+            {/* 모바일 이력서 패널 토글 */}
             <button
-              onClick={sendMessage}
-              disabled={isLoading || (!input.trim() && !resumeText)}
-              className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-surface transition-all hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
-              aria-label={t("chat.send")}
+              onClick={() => setPanelOpen((v) => !v)}
+              className="shrink-0 md:hidden flex h-11 w-11 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:border-accent/30 hover:text-accent"
+              aria-label={panelOpen ? t("resume.hide") : t("resume.show")}
+              aria-expanded={panelOpen}
             >
-              <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+              <PanelRight className="h-5 w-5" />
             </button>
+
+            {isLoading ? (
+              <button
+                onClick={handleStop}
+                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg border border-surface-border text-text-secondary transition-colors hover:border-accent/40 hover:text-accent"
+                aria-label={t("chat.stop")}
+                title={t("chat.stop")}
+              >
+                <Square className="h-4 w-4" fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim() && !resumeText}
+                className="shrink-0 flex h-11 w-11 items-center justify-center rounded-lg bg-accent text-surface transition-all hover:brightness-110 disabled:opacity-30 disabled:cursor-not-allowed active:scale-95"
+                aria-label={t("chat.send")}
+              >
+                <ArrowUp className="h-5 w-5" strokeWidth={2.5} />
+              </button>
+            )}
           </div>
         </div>
       </div>
+
+      {/* ── 이력서 패널 ──
+          데스크톱: 우측 고정 컬럼 / 모바일: 토글 오버레이 */}
+      <aside
+        className={`
+          border-surface-border bg-surface
+          ${panelOpen ? "fixed inset-0 z-40 flex flex-col" : "hidden"}
+          md:static md:z-auto md:flex md:w-80 lg:w-96 md:shrink-0 md:flex-col md:border-l
+          ${keyboardOpen ? "md:flex" : ""}
+        `}
+        aria-label={t("resume.title")}
+      >
+        {/* 모바일 닫기 바 */}
+        {panelOpen && (
+          <div className="flex items-center justify-between border-b border-surface-border px-4 py-3 md:hidden">
+            <span className="text-sm font-semibold">{t("resume.title")}</span>
+            <button
+              onClick={() => setPanelOpen(false)}
+              className="rounded-lg p-1.5 text-text-secondary hover:bg-surface-elevated"
+              aria-label={t("resume.hide")}
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1">
+          <ResumePanel
+            doc={resume.doc}
+            reset={resume.reset}
+            completeness={resume.completeness}
+            setBasicsField={resume.setBasicsField}
+            patch={resume.patch}
+            upsertItem={resume.upsertItem}
+            removeItem={resume.removeItem}
+          />
+        </div>
+      </aside>
     </div>
   );
 }

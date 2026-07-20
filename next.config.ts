@@ -20,16 +20,26 @@ import type { NextConfig } from "next";
  * react-markdown은 rehype-raw 없이 원시 HTML을 이스케이프하고,
  * 인쇄용 HTML은 모든 사용자 입력을 escape합니다.
  */
+/**
+ * Cloudflare Web Analytics 비콘.
+ *
+ * Cloudflare가 **엣지에서** 이 스크립트를 페이지에 주입하기 때문에, 우리 코드에는
+ * 흔적이 없는데도 CSP에 걸립니다. 로컬 workerd에서는 주입이 없어 재현되지 않고,
+ * **실제 배포된 사이트를 브라우저로 열어야** 드러납니다.
+ * (허용하지 않으면 앱은 정상 동작하지만 분석 데이터가 조용히 사라집니다.)
+ */
+const CF_ANALYTICS = 'https://static.cloudflareinsights.com';
+
 const CSP = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src 'self' 'unsafe-inline' ${CF_ANALYTICS}`,
   "style-src 'self' 'unsafe-inline'",
   // 이미지 유출 채널 차단 — 원격 출처를 일절 허용하지 않습니다.
   "img-src 'self' data: blob:",
   // next/font가 폰트를 빌드 타임에 self-host하므로 외부 출처가 필요 없습니다.
   "font-src 'self' data:",
-  // API는 same-origin뿐입니다.
-  "connect-src 'self'",
+  // API는 same-origin, 그리고 분석 비콘의 전송 대상만 허용합니다.
+  `connect-src 'self' ${CF_ANALYTICS} https://cloudflareinsights.com`,
   // pdfjs 워커
   "worker-src 'self' blob:",
   // 이력서 인쇄용 srcdoc iframe

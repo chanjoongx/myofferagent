@@ -15,6 +15,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'landing.subtitle':
       'AI가 이력서 작성부터 맞춤 채용공고 매칭까지,\n취업 준비의 모든 과정을 함께합니다',
     'landing.cta': '시작하기',
+    'landing.ctaHint': '가입 없이 브라우저에서 바로 시작',
     'landing.flowTitle': 'Agent Workflow',
 
     // ── Agent Steps ──
@@ -66,6 +67,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'job.hybrid': 'Hybrid',
     'job.noSponsorship': '스폰서십 불가',
     'job.sponsors': '스폰서십 가능',
+    'job.posted': '게시일',
 
     // ── ATS Score Card ──
     'ats.title': 'ATS 호환성 점수',
@@ -180,6 +182,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'landing.subtitle':
       'From resume building to job matching,\nAI guides you through every step of your career journey',
     'landing.cta': 'Get Started',
+    'landing.ctaHint': 'No sign-up — start right in your browser',
     'landing.flowTitle': 'Agent Workflow',
 
     'step.triage': 'Triage',
@@ -227,6 +230,7 @@ export const dict: Record<Locale, Record<string, string>> = {
     'job.hybrid': 'Hybrid',
     'job.noSponsorship': 'No sponsorship',
     'job.sponsors': 'Sponsors visa',
+    'job.posted': 'Posted',
 
     'ats.title': 'ATS Compatibility Score',
     'ats.formatCompatibility': 'Format Compatibility',

@@ -149,6 +149,11 @@ export interface JobSearchResult {
    * "no-sponsorship" 공고는 매칭률과 무관하게 지원할 수 없습니다.
    */
   sponsorship?: 'sponsors' | 'no-sponsorship' | 'unknown';
+  /**
+   * 출처가 보여 준 게시일/게시 경과 원문 ("2026-07-15", "3 weeks ago").
+   * 신선도 판단용 — 출처에 없으면 빈 문자열이며 카드에 표시하지 않습니다.
+   */
+  postedDate?: string;
 }
 
 // ---------- 파싱된 이력서 ----------

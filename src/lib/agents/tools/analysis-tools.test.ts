@@ -16,7 +16,7 @@ vi.mock('../openai-client', () => ({
   })),
 }));
 
-import { analyzeAts, reportMatch } from './analysis-tools';
+import { analyzeAts, reportMatch, reportJobs } from './analysis-tools';
 import { callJson } from '../openai-client';
 import { createContext, type AppContext } from '../context';
 import { coerceResume } from '@/lib/resume/schema';
@@ -166,5 +166,52 @@ describe('report_match 날조 수치 차단', () => {
 
     const edit = ctx.emitted.match?.resumeEdits?.[0];
     expect(edit?.suggested).toBe('Reduced response time 40% by adding Redis caching');
+  });
+});
+
+/* report_jobs 구조화 리포트 (2026-07-21 신선도 파이프라인에서 추가)
+ * postedDate는 Scout이 검색 결과에서 실제로 본 문자열만 담는 신선도 신호입니다.
+ * 카드까지 그대로 흘러야 하고, 안전하지 않은 URL은 여기서 소거되어야 합니다. */
+describe('report_jobs', () => {
+  const baseJob = {
+    company: 'Acme',
+    position: 'SWE New Grad',
+    location: 'Irvine, CA',
+    type: 'onsite',
+    url: 'https://acme.com/jobs/1',
+    requirements: [],
+    estimatedMatch: 70,
+    sponsorship: 'unknown',
+    postedDate: '',
+  };
+
+  it('postedDate가 emitted.jobs로 그대로 전달된다 (없으면 빈 문자열)', async () => {
+    const ctx = createContext({});
+
+    await reportJobs.invoke(
+      runContextFor(ctx),
+      JSON.stringify({
+        jobs: [
+          { ...baseJob, postedDate: '3 weeks ago' },
+          { ...baseJob, company: 'Beta', position: 'ML Intern', postedDate: '' },
+        ],
+      }),
+    );
+
+    expect(ctx.emitted.jobs).toHaveLength(2);
+    expect(ctx.emitted.jobs?.[0].postedDate).toBe('3 weeks ago');
+    expect(ctx.emitted.jobs?.[1].postedDate).toBe('');
+  });
+
+  it('안전하지 않은 URL은 빈 문자열로 소거된다', async () => {
+    const ctx = createContext({});
+
+    await reportJobs.invoke(
+      runContextFor(ctx),
+      // eslint-disable-next-line no-script-url
+      JSON.stringify({ jobs: [{ ...baseJob, url: 'javascript:alert(1)' }] }),
+    );
+
+    expect(ctx.emitted.jobs?.[0].url).toBe('');
   });
 });

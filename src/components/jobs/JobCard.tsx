@@ -1,5 +1,6 @@
 "use client";
 
+import { CalendarDays } from "lucide-react";
 import { useLanguage } from "@/lib/i18n-context";
 import { isSafeUrl } from "@/lib/url-utils";
 import type { JobSearchResult } from "@/lib/types";
@@ -92,6 +93,17 @@ export default function JobCard({ job, onAnalyze }: JobCardProps) {
         {job.sponsorship === "sponsors" && (
           <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-medium text-emerald-400">
             {t("job.sponsors")}
+          </span>
+        )}
+        {/* 게시일 — Scout이 검색 결과에서 실제로 본 문자열만 옵니다 (추측 금지 규칙).
+            비어 있으면 신선도를 확인 못 한 공고이므로 아무것도 표시하지 않습니다. */}
+        {job.postedDate && (
+          <span
+            className="inline-flex items-center gap-1 text-[10px] text-text-secondary"
+            aria-label={`${t("job.posted")}: ${job.postedDate}`}
+          >
+            <CalendarDays className="h-3 w-3" aria-hidden="true" />
+            {job.postedDate}
           </span>
         )}
       </div>

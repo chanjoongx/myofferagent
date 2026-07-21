@@ -88,10 +88,18 @@ export async function extractTextFromPDF(file: File): Promise<string> {
     for (let i = 1; i <= pageCount; i++) {
       const page = await doc.getPage(i);
       const content = await page.getTextContent();
-      const text = content.items
-        .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
-        .filter(Boolean)
-        .join(' ');
+      /* 줄 구조를 보존합니다. 예전에는 모든 조각을 공백으로 이어 붙여 한 페이지가
+       * 한 줄이 됐고, 그 텍스트를 구조화하는 LLM(import_resume_text)이 섹션 제목과
+       * 불릿 경계를 추측해야 했습니다. pdf.js는 줄이 바뀌는 조각에 hasEOL을
+       * 표시하므로(자체 텍스트 레이어가 쓰는 값) 그대로 줄바꿈으로 반영합니다.
+       * hasEOL이 전혀 없는 PDF는 이전과 동일하게 공백 연결로 동작합니다. */
+      let pageText = '';
+      for (const item of content.items) {
+        if (!('str' in item) || typeof item.str !== 'string') continue;
+        pageText += item.str;
+        pageText += 'hasEOL' in item && item.hasEOL ? '\n' : ' ';
+      }
+      const text = pageText.replace(/[ \t]+\n/g, '\n').replace(/ {2,}/g, ' ').trimEnd();
       // 워커에 페이지 리소스가 계속 쌓이지 않도록 각 페이지를 정리합니다.
       page.cleanup();
       pageTexts.push(text);
@@ -99,7 +107,7 @@ export async function extractTextFromPDF(file: File): Promise<string> {
       if (total >= MAX_PDF_TEXT_CHARS) break;
     }
 
-    const result = pageTexts.join('\n').slice(0, MAX_PDF_TEXT_CHARS).trim();
+    const result = pageTexts.join('\n\n').slice(0, MAX_PDF_TEXT_CHARS).trim();
     if (!result) {
       throw new Error('PDF에서 텍스트를 추출할 수 없습니다. 스캔된 이미지 PDF일 수 있습니다.');
     }

@@ -283,6 +283,18 @@ const JobSchema = z.object({
   requirements: z.array(z.string().max(300)).max(8).default([]),
   estimatedMatch: z.number().min(0).max(100).default(0),
   /**
+   * 게시 시점 — 마감된 공고를 걸러내는 신선도 신호.
+   * 출처가 보여 준 문자열 그대로 받습니다 ("2026-07-15", "3 weeks ago").
+   * 형식을 강제하면 모델이 맞추려고 날짜를 지어내므로 자유 문자열로 둡니다.
+   */
+  postedDate: z
+    .string()
+    .max(60)
+    .default('')
+    .describe(
+      '검색 결과에 보인 게시일 또는 게시 경과를 그대로 (예: "2026-07-15", "3 weeks ago"). 출처에 없으면 빈 문자열 — 절대 추측하지 마세요.',
+    ),
+  /**
    * 스폰서십 가능 여부.
    *
    * 이 앱의 사용자는 대부분 미국 취업 자격이 없는 한국 국적자입니다.

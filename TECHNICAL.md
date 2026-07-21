@@ -40,7 +40,8 @@ document and hand off to each other inside a single chat.
 
 - Conversational resume building; every user answer is persisted through patch tools
 - 100-point ATS scoring: 65 points deterministic in code, 35 points model-judged
-- Live job search through the SDK's hosted web search tool, with visa sponsorship flagged
+- Live job search through the SDK's hosted web search tool, date-grounded per turn,
+  with visa sponsorship and posting freshness (`postedDate`) flagged
 - Resume-to-posting match analysis and grounded cover letter drafting
 - Export as PDF (browser print engine), DOCX, Markdown, and JSON
 
@@ -82,11 +83,15 @@ Browser (React 19, localStorage resume)
 ### Handoff graph
 
 ```
-Triage ──> { Resume Builder, Resume Analyzer, Job Scout }
-Resume Builder  <──> Resume Analyzer ──> Job Scout <──> Match Strategy ──> Application Writer
+Triage ──> { Resume Builder, Resume Analyzer, Job Scout, Match Strategy, Application Writer }
+Resume Builder  <──> Resume Analyzer ──> { Job Scout, Match Strategy }
+Job Scout <──> Match Strategy ──> Application Writer
 ```
 
-Reverse edges exist everywhere a real user flow needs to go back (for example
+Triage reaches Match Strategy and Application Writer directly because first-turn
+messages really do arrive with a pasted posting ("how well do I fit this?") or a
+cover-letter ask; both agents collect their own missing prerequisites and can hand
+back. Reverse edges exist everywhere a real user flow needs to go back (for example
 Application Writer back to Job Scout). Cycles are fine; `maxTurns: 20` bounds any loop.
 
 ---
@@ -105,7 +110,7 @@ Application Writer back to Job Scout). Cycles are fine; `maxTurns: 20` bounds an
 | DOCX | `docx` 9.x | dynamic import, only loaded on DOCX export |
 | Markdown render | `react-markdown` + `remark-gfm` | raw HTML stays escaped, images never rendered |
 | Hosting | Cloudflare Workers | `@opennextjs/cloudflare` 1.20 + wrangler 4 |
-| Tests | vitest (321 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
+| Tests | vitest (323 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
 
 Models (`src/lib/agents/model-config.ts`):
 
@@ -126,6 +131,9 @@ Model changes must be validated with `npm run check:models` (makes real billed c
 to locale and resume state without string surgery:
 
 - `languageRule(ctx)`: answer in Korean or English; resume content itself stays English
+- `dateRule()`: injects today's date (UTC), re-evaluated every turn. The model does not
+  know the current date, and posting freshness, recruiting-cycle years ("New Grad 2027"),
+  deadlines, and cover-letter dating all depend on it
 - `resumeState(ctx)`: injects only **presence** (set / MISSING / counts), never field
   values. Field values reach the model through `get_resume` tool output, which is the
   position models treat as data rather than instructions
@@ -135,10 +143,10 @@ Per-agent notes:
 
 | Agent | Tools | Notable rules |
 |:------|:------|:--------------|
-| Triage | none | routes only; cannot reach Match or Writer directly |
+| Triage | none | routes only; pasted-posting fit questions go to Match Strategy, cover-letter asks to Application Writer |
 | Resume Builder | patch tools + `improve_bullets` | save first, improve second; never invent numbers |
-| Resume Analyzer | `get_resume`, `import_resume_text`, `analyze_ats` | import replaces the document, confirm when one exists |
-| Job Scout | `webSearchTool()`, `report_jobs` | prompt limit 3 searches (code breaker at 8); always constrain to early career; flag sponsorship |
+| Resume Analyzer | `get_resume`, `import_resume_text`, `analyze_ats` | import replaces the document, confirm when one exists; pasted-posting fit questions hand off to Match Strategy |
+| Job Scout | `webSearchTool()`, `get_resume`, `report_jobs` | prompt limit 3 searches (code breaker at 8); reads the resume first to shape queries; always constrain to early career; prefer postings ≤30 days old, treat past-cycle postings as closed, report `postedDate` only as literally seen; flag sponsorship |
 | Match Strategy | `get_resume`, `report_match` | refuses to analyze without concrete posting details |
 | Application Writer | `get_resume` | 250-400 word cover letter grounded in the resume |
 
@@ -282,7 +290,10 @@ Structured reporting is explicit: tools write to `ctx.emitted`, the route serial
 `ctx.emitted` into `done.structuredData`, and the client renders cards from it. There
 is no output-string sniffing. `report_jobs` validates every URL with `isSafeUrl()`
 (absolute http/https only) and counts no-sponsorship postings so the agent must
-mention them.
+mention them. Each job also carries `postedDate`, a free-form string holding the
+posting date or age exactly as the search source showed it ("2026-07-15", "3 weeks
+ago") — free-form because forcing a date format makes the model fabricate one; empty
+means unverified and the card shows nothing.
 
 ### `web_search`
 
@@ -517,7 +528,7 @@ Baseline as of 2026-07-21:
 
 | Layer | Command | Count |
 |:------|:--------|:------|
-| Types + unit + build | `npm run check` | 321 vitest tests |
+| Types + unit + build | `npm run check` | 323 vitest tests |
 | Real browser vs workerd | `node scripts/verify/browser.mjs <url> scripts/verify` | 16 checks (pdfjs origin, CSP, PDF round-trip, panel edit persistence, multi-tab sync, IME guard) |
 | Accessibility | `node scripts/verify/verify-a11y.mjs <url>` | 21 checks |
 | Sidebar completion truthfulness | `node scripts/verify/verify-checkmarks.mjs <url>` | 7 checks, calls the real model |

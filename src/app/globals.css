@@ -150,6 +150,17 @@ html.light .hero-glow::after {
   animation: fade-in 0.2s ease-out, slide-in-from-bottom-2 0.2s ease-out;
 }
 
+/* 랜딩 히어로의 순차 등장. `both`라 시작 전에는 투명하게 대기하고,
+   reduced-motion에서 animation이 제거되면 fill도 사라져 그냥 보입니다.
+   (지연은 Tailwind [animation-delay:*]로 요소마다 다르게 겁니다.) */
+@keyframes rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-rise {
+  animation: rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
 /* ── Drawer slide ── */
 @keyframes slide-down {
   from { max-height: 0; opacity: 0; }
@@ -191,6 +202,7 @@ html.light .custom-scrollbar::-webkit-scrollbar-thumb:hover {
 /* ── Reduced motion ── */
 @media (prefers-reduced-motion: reduce) {
   .animate-in,
+  .animate-rise,
   .drawer-enter {
     animation: none !important;
   }

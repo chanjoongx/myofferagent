@@ -111,10 +111,14 @@ export function isStrongVerb(word: string): boolean {
 /* ── 1인칭 대명사 ── */
 /** `I/O`는 1인칭이 아닙니다 — 먼저 걷어냅니다. */
 const NON_PRONOUN = /\bI\/O\b/gi;
+/** `US`/`U.S.`(미국)도 대명사 us가 아닙니다. 대소문자 구분으로만 매칭해
+ *  "US users"는 걷어내고 소문자 "helped us"는 그대로 잡습니다.
+ *  (이 앱의 사용자는 미국 취업 준비생이라 불릿에 US가 흔히 등장합니다.) */
+const NON_PRONOUN_US = /\bU\.?S\.?(?=\s|$|[,;:)])/g;
 const FIRST_PERSON_RE = /\b(i|my|me|we|our|us)\b/i;
 
 export function hasFirstPerson(text: string): boolean {
-  return FIRST_PERSON_RE.test(text.replace(NON_PRONOUN, ' '));
+  return FIRST_PERSON_RE.test(text.replace(NON_PRONOUN, ' ').replace(NON_PRONOUN_US, ' '));
 }
 
 /** 미국 이력서에 있으면 안 되는 개인정보 (한국 이력서 관행에서 넘어오는 항목) */

@@ -110,7 +110,7 @@ Application Writer back to Job Scout). Cycles are fine; `maxTurns: 20` bounds an
 | DOCX | `docx` 9.x | dynamic import, only loaded on DOCX export |
 | Markdown render | `react-markdown` + `remark-gfm` | raw HTML stays escaped, images never rendered |
 | Hosting | Cloudflare Workers | `@opennextjs/cloudflare` 1.20 + wrangler 4 |
-| Tests | vitest (323 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
+| Tests | vitest (334 unit tests) + 4 Playwright/live harnesses | see [Verification](#12-verification) |
 
 Models (`src/lib/agents/model-config.ts`):
 
@@ -243,9 +243,15 @@ return compact JSON snapshots, never the whole document.
 `get_resume`, `set_basics`, `upsert_education`, `upsert_experience`, `upsert_project`,
 `set_skills`, `remove_entry`.
 
+- `get_resume` has two views: `summary` (progress snapshot — counts and presence only)
+  and `full` (the actual document, capped at 30k serialized chars against adversarial
+  documents). Writer, Match Strategy, and Job Scout are instructed to call `full`
+  because the summary contains no bullet text, skills, or dates to ground in.
 - Patch semantics: empty string means "leave unchanged"; the sentinel `__CLEAR__`
   means "clear this field" (strict tool schemas force every field to be present, so a
-  second in-band signal is required to distinguish the two).
+  second in-band signal is required to distinguish the two). Sentinels mixed into an
+  array are stripped rather than stored as content. Adding a new item to a section
+  already at its 20-item cap reports failure instead of a false "saved".
 - List items carry stable 8-char ids so the model can edit one entry without
   re-serializing the document.
 - Every mutation passes through `coerceResume()`, which clamps rather than rejects.
@@ -326,7 +332,9 @@ agents, the ATS scorer, the editor panel, and every exporter.
 - **Ids everywhere** so patches address one item.
 - **3-way merge** (`threeWayMerge`): while a 20-40s turn streams, the user can keep
   editing the panel. Server results merge with base = document at send time; fields
-  the user changed win, deletions stay deleted, additions survive.
+  the user changed win, deletions stay deleted, additions survive. When the agent
+  deletes an item the user was editing in the same window, the delete wins by design —
+  resurrecting the item would undo a deletion the user just asked for in chat.
 - **Renderers** (`render/`): `markdown.ts` (minimal escaping, URL percent-encoding so
   parens/spaces cannot break the link syntax), `print-html.ts` (every value HTML-escaped,
   `javascript:` hrefs dropped, single-column ATS-safe layout, browser-print to PDF),
@@ -480,8 +488,9 @@ errors fall through to the fallback.
 
 ### Response headers (`next.config.ts`, applied to every worker-served route)
 
-- CSP: `default-src 'self'`; scripts/styles self + inline (Next bootstrap); images
-  self/data/blob only; connect limited to self + Cloudflare Analytics;
+- CSP: `default-src 'self'`; scripts self + inline + Cloudflare Analytics, styles
+  self + inline (Next bootstrap); images self/data/blob only; connect limited to
+  self + Cloudflare Analytics;
   `frame-ancestors 'none'`; `object-src 'none'`; `base-uri`/`form-action 'self'`
 - `Strict-Transport-Security: max-age=63072000; includeSubDomains` (Cloudflare does
   not add HSTS to a custom domain by default; without it a first-visit http:// request
@@ -528,7 +537,7 @@ Baseline as of 2026-07-21:
 
 | Layer | Command | Count |
 |:------|:--------|:------|
-| Types + unit + build | `npm run check` | 323 vitest tests |
+| Types + unit + build | `npm run check` | 334 vitest tests |
 | Real browser vs workerd | `node scripts/verify/browser.mjs <url> scripts/verify` | 16 checks (pdfjs origin, CSP, PDF round-trip, panel edit persistence, multi-tab sync, IME guard) |
 | Accessibility | `node scripts/verify/verify-a11y.mjs <url>` | 21 checks |
 | Sidebar completion truthfulness | `node scripts/verify/verify-checkmarks.mjs <url>` | 7 checks, calls the real model |
@@ -538,6 +547,11 @@ Baseline as of 2026-07-21:
 passes against production. The model-calling harnesses bill the real OpenAI key: run
 the full production e2e once per release, and iterate on single scenarios
 (`node scripts/verify/e2e.mjs <url> analyzer`) while debugging.
+
+Known nuance: a tool that fails through its `errorFunction` still streams as a normal
+`tool_output` item, so its agent earns a sidebar checkmark despite doing nothing. The
+SDK item does not reliably distinguish that case, so it is accepted rather than
+half-detected.
 
 ---
 

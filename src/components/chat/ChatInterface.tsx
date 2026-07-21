@@ -85,7 +85,7 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
             {data.keywordGap.matched.map((kw, i) => (
               <span
                 key={`${kw}-${i}`}
-                className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] text-emerald-400"
+                className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] text-emerald-400 light:text-emerald-700"
               >
                 {kw}
               </span>
@@ -100,7 +100,7 @@ function MatchResultCard({ data }: { data: MatchAnalysis }) {
             {data.keywordGap.missing.map((kw, i) => (
               <span
                 key={`${kw}-${i}`}
-                className="rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[11px] text-orange-400"
+                className="rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[11px] text-orange-400 light:text-orange-700"
               >
                 {kw}
               </span>
@@ -359,8 +359,12 @@ export default function ChatInterface() {
     ]);
   }, [locale, t, resetAgent, endStreaming]);
 
-  // 자동 스크롤
+  // 자동 스크롤 — 사용자가 위로 스크롤해 이전 메시지를 읽는 중이면 끌어내리지
+  // 않습니다. 스트리밍은 rAF마다 messages를 갱신하므로, 이 가드가 없으면
+  // 20~40초 응답 동안 화면이 계속 바닥에 못 박혀 위를 읽을 수 없습니다.
   useEffect(() => {
+    const el = scrollRef.current;
+    if (el && el.scrollHeight - el.scrollTop - el.clientHeight > 120) return;
     const id = requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         scrollRef.current?.scrollTo({
@@ -929,7 +933,6 @@ export default function ChatInterface() {
           border-surface-border bg-surface
           ${panelOpen ? "fixed inset-0 z-40 flex flex-col" : "hidden"}
           md:static md:z-auto md:flex md:w-80 lg:w-96 md:shrink-0 md:flex-col md:border-l
-          ${keyboardOpen ? "md:flex" : ""}
         `}
         role={panelIsModal ? "dialog" : undefined}
         aria-modal={panelIsModal || undefined}

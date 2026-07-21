@@ -76,9 +76,9 @@ const ICONS: Record<ToastType, typeof AlertTriangle> = {
 };
 
 const STYLES: Record<ToastType, string> = {
-  error: "border-red-500/30 bg-red-500/10 text-red-400",
+  error: "border-red-500/30 bg-red-500/10 text-red-400 light:text-red-600",
   success: "border-accent/30 bg-accent/10 text-accent",
-  info: "border-blue-500/30 bg-blue-500/10 text-blue-400",
+  info: "border-blue-500/30 bg-blue-500/10 text-blue-400 light:text-blue-600",
 };
 
 function ToastItem({ toast, onRemove }: { toast: Toast; onRemove: (id: number) => void }) {

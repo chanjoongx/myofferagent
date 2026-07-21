@@ -45,7 +45,19 @@ class OpenAIError extends Error {
   }
 }
 
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+/** 취소를 인지하는 sleep — 사용자가 중지를 누르면 백오프 대기(최대 20초)를
+ *  끝까지 붙들지 않고 즉시 깨어납니다. */
+const sleep = (ms: number, signal?: AbortSignal) =>
+  new Promise<void>((resolve) => {
+    if (signal?.aborted) return resolve();
+    const timer = setTimeout(done, ms);
+    function done() {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', done);
+      resolve();
+    }
+    signal?.addEventListener('abort', done, { once: true });
+  });
 
 /** 지수 백오프 + 지터 */
 function backoffMs(attempt: number, retryAfter?: string | null): number {
@@ -177,7 +189,8 @@ export async function callText(
 
       // 429 / 5xx만 재시도 대상
       if ((res.status === 429 || res.status >= 500) && attempt < MAX_RETRIES) {
-        await sleep(backoffMs(attempt, res.headers.get('retry-after')));
+        await sleep(backoffMs(attempt, res.headers.get('retry-after')), options.signal);
+        if (options.signal?.aborted) throw lastError;
         continue;
       }
       throw lastError;
@@ -189,7 +202,8 @@ export async function callText(
       if (options.signal?.aborted) throw lastError;
 
       if (attempt < MAX_RETRIES) {
-        await sleep(backoffMs(attempt));
+        await sleep(backoffMs(attempt), options.signal);
+        if (options.signal?.aborted) throw lastError;
         continue;
       }
     }

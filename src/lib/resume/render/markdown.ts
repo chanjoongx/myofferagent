@@ -22,7 +22,9 @@ import { formatDateRange, formatEducationDate, contactLine, sectionOrder } from 
  * 문장 중간의 `.` `-` 등은 마크다운에서 아무 의미가 없으므로 건드리지 않습니다.
  */
 const INLINE_ESCAPE = /([\\`*_[\]<>])/g;
-const LINE_LEAD_ESCAPE = /^(\s*)([#>+-]|\d+\.)/;
+// gm: 스키마가 값 안의 줄바꿈을 보존하므로, 첫 줄만 지키면 "요약\n# 제목" 같은
+// 값의 **둘째 줄부터가 진짜 마크다운 구조로 주입**됩니다. 모든 줄머리를 지킵니다.
+const LINE_LEAD_ESCAPE = /^(\s*)([#>+-]|\d+\.)/gm;
 
 function esc(s: string): string {
   return s.replace(INLINE_ESCAPE, '\\$1').replace(LINE_LEAD_ESCAPE, '$1\\$2');

@@ -195,7 +195,7 @@ function MessageBubble({
 
   return (
     <div
-      className={`group flex ${isUser ? "justify-end" : "justify-start"} gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-200`}
+      className={`group flex ${isUser ? "justify-end" : "justify-start"} gap-2.5 animate-in`}
     >
       {/* Assistant avatar */}
       {!isUser && (

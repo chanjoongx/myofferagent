@@ -230,6 +230,32 @@ describe('formatEducationDate — 졸업일 하나만 표기', () => {
   it('과거 졸업일은 그대로', () => {
     expect(formatEducationDate('Sep 2018', 'Jun 2022', new Date('2025-07-01'))).toBe('Jun 2022');
   });
+
+  it('같은 해의 미래 졸업월에도 Expected를 붙인다 (봄에 지원하는 12월 졸업예정자)', () => {
+    expect(formatEducationDate('Sep 2022', 'Dec 2026', new Date('2026-07-01'))).toBe(
+      'Expected Dec 2026',
+    );
+  });
+
+  it('같은 해의 지나간 졸업월은 그대로', () => {
+    expect(formatEducationDate('Sep 2022', 'Mar 2026', new Date('2026-07-01'))).toBe('Mar 2026');
+  });
+
+  it('연도만 적힌 같은 해 졸업일은 미래로 단정하지 않는다', () => {
+    expect(formatEducationDate('', '2026', new Date('2026-07-01'))).toBe('2026');
+  });
+});
+
+describe('마크다운 다중 행 값 주입 방지', () => {
+  it('값 안의 둘째 줄부터 나오는 마크다운 구조도 이스케이프된다', () => {
+    const doc = coerceResume({
+      basics: { name: 'K', summary: 'ok line\n# Injected heading\n- injected item' },
+    });
+    const md = toMarkdown(doc);
+    expect(md).not.toMatch(/^# Injected heading$/m);
+    expect(md).not.toMatch(/^- injected item$/m);
+    expect(md).toContain('\\# Injected heading');
+  });
 });
 
 /* ────────────────────────────────────────────

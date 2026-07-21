@@ -15,12 +15,12 @@ const TYPE_STYLES: Record<
   JobSearchResult["type"],
   { labelKey: string; className: string }
 > = {
-  remote: { labelKey: "job.remote", className: "bg-emerald-500/15 text-emerald-400" },
-  onsite: { labelKey: "job.onsite", className: "bg-blue-500/15 text-blue-400" },
-  hybrid: { labelKey: "job.hybrid", className: "bg-purple-500/15 text-purple-400" },
+  remote: { labelKey: "job.remote", className: "bg-emerald-500/15 text-emerald-400 light:text-emerald-700" },
+  onsite: { labelKey: "job.onsite", className: "bg-blue-500/15 text-blue-400 light:text-blue-600" },
+  hybrid: { labelKey: "job.hybrid", className: "bg-purple-500/15 text-purple-400 light:text-purple-700" },
 };
 
-const TYPE_FALLBACK = { labelKey: "job.onsite", className: "bg-gray-500/15 text-gray-400" };
+const TYPE_FALLBACK = { labelKey: "job.onsite", className: "bg-gray-500/15 text-gray-400 light:text-gray-600" };
 
 function MiniMatchRing({ value }: { value: number }) {
   const { t } = useLanguage();
@@ -86,23 +86,23 @@ export default function JobCard({ job, onAnalyze }: JobCardProps) {
         {/* 스폰서십 여부 — 서버 도구가 수집하는 값입니다. 이 앱의 주 사용자는
             미국 취업 자격이 없어서, "불가"는 매칭률보다 먼저 봐야 하는 정보입니다. */}
         {job.sponsorship === "no-sponsorship" && (
-          <span className="rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-medium text-red-400">
+          <span className="rounded-full bg-red-500/15 px-2.5 py-0.5 text-[10px] font-medium text-red-400 light:text-red-600">
             {t("job.noSponsorship")}
           </span>
         )}
         {job.sponsorship === "sponsors" && (
-          <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-medium text-emerald-400">
+          <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[10px] font-medium text-emerald-400 light:text-emerald-700">
             {t("job.sponsors")}
           </span>
         )}
         {/* 게시일 — Scout이 검색 결과에서 실제로 본 문자열만 옵니다 (추측 금지 규칙).
-            비어 있으면 신선도를 확인 못 한 공고이므로 아무것도 표시하지 않습니다. */}
+            비어 있으면 신선도를 확인 못 한 공고이므로 아무것도 표시하지 않습니다.
+            라벨은 sr-only 텍스트로 붙입니다 — 일반 span의 aria-label은 ARIA에서
+            금지라 스크린리더 대부분이 무시합니다. */}
         {job.postedDate && (
-          <span
-            className="inline-flex items-center gap-1 text-[10px] text-text-secondary"
-            aria-label={`${t("job.posted")}: ${job.postedDate}`}
-          >
+          <span className="inline-flex items-center gap-1 text-[10px] text-text-secondary">
             <CalendarDays className="h-3 w-3" aria-hidden="true" />
+            <span className="sr-only">{t("job.posted")}: </span>
             {job.postedDate}
           </span>
         )}

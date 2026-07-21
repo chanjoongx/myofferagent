@@ -86,6 +86,10 @@ const ParsedResumeSchema = z.object({
         role: z.string().default(''),
         url: z.string().default(''),
         tech: z.array(z.string()).default([]),
+        // 정본 스키마와 렌더러는 프로젝트 날짜를 표시합니다 — 여기서 빠지면
+        // 임포트가 원문에 있던 날짜를 조용히 유실합니다.
+        startDate: z.string().default(''),
+        endDate: z.string().default(''),
         bullets: z.array(z.string()).default([]),
       }),
     )
@@ -130,7 +134,7 @@ Shape:
 { "basics": { "name","email","phone","location","linkedin","github","website","summary" },
   "education": [{ "school","degree","major","gpa","location","startDate","endDate" }],
   "experience": [{ "company","title","location","startDate","endDate","current","bullets":[] }],
-  "projects": [{ "name","role","url","tech":[],"bullets":[] }],
+  "projects": [{ "name","role","url","tech":[],"startDate","endDate","bullets":[] }],
   "skills": { "languages":[],"frameworks":[],"tools":[],"other":[] } }`;
 
     // 프롬프트 인젝션 방어: 데이터 안의 울타리 마커를 먼저 제거한 뒤 감쌉니다.

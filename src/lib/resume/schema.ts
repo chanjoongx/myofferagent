@@ -54,9 +54,14 @@ const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[
 const stripControls = (s: string) =>
   s.replace(/\r\n?/g, '\n').replace(CONTROL_CHARS, '').replace(LONE_SURROGATE, '');
 
+/** 길이 절삭 — 상한 경계가 이모지(서로게이트 쌍) 한가운데를 자르면
+ *  stripControls가 방금 지운 종류의 홀로 남은 서로게이트가 다시 생깁니다.
+ *  절삭 **후에** 한 번 더 걷어냅니다. */
+const clampLen = (s: string, max: number) => s.slice(0, max).replace(LONE_SURROGATE, '');
+
 /** 문자열 — 항상 성공. 문자열이 아니면 빈 값, 길면 자른다. */
 const text = (max: number) =>
-  z.unknown().transform((v) => (typeof v === 'string' ? stripControls(v).trim().slice(0, max) : ''));
+  z.unknown().transform((v) => (typeof v === 'string' ? clampLen(stripControls(v).trim(), max) : ''));
 
 /** 문자열 배열 — 항상 성공. 빈 항목 제거 + 개수·길이 절삭. */
 const stringList = (maxItems: number, maxLen: number) =>
@@ -64,7 +69,7 @@ const stringList = (maxItems: number, maxLen: number) =>
     if (!Array.isArray(v)) return [];
     return v
       .filter((s): s is string => typeof s === 'string')
-      .map((s) => stripControls(s).trim().slice(0, maxLen))
+      .map((s) => clampLen(stripControls(s).trim(), maxLen))
       .filter((s) => s.length > 0)
       .slice(0, maxItems);
   });
@@ -332,6 +337,11 @@ export function threeWayMerge(
       // 사용자가 스트리밍 도중 **삭제한** 항목은 되살리지 않습니다.
       // (base에 있었는데 ours에 없다 = 사용자가 지웠다)
       if (!ourItem && baseItem) continue;
+      /* 반대 방향(에이전트가 remove_entry로 지운 항목을 사용자가 같은 턴에
+       * 패널에서 고치던 중)은 **삭제가 이깁니다** — theirs에 없는 id는 아래
+       * 꼬리 루프의 baseById 가드에 걸려 되살아나지 않습니다. 사용자가 채팅으로
+       * 삭제를 요청해 놓고 패널 필드를 스치는 경우가 그 반대보다 흔해서,
+       * 편집을 되살리면 방금 부탁한 삭제를 무효화하는 결과가 됩니다. */
 
       merged.push(
         ourItem && baseItem ? pick(baseItem, ourItem, theirItem) : (ourItem ?? theirItem),

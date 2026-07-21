@@ -75,6 +75,13 @@ describe('hasFirstPerson — I/O는 1인칭이 아니다', () => {
     expect(hasFirstPerson('Improved I/O throughput by 40%')).toBe(false);
   });
 
+  it.each(['Optimized checkout flow for US users', 'Localized pricing for the U.S. market'])(
+    'US(미국)를 대명사 us로 오탐하지 않음: %s',
+    (b) => {
+      expect(hasFirstPerson(b)).toBe(false);
+    },
+  );
+
   it.each(['CI pipelines', 'BI dashboards', 'AI models', 'iOS app', 'MySQL tuning'])(
     '기술 약어를 오탐하지 않음: %s',
     (b) => {

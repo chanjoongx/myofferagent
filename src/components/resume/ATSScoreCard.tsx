@@ -24,9 +24,9 @@ function ScoreRing({ score }: { score: number }) {
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (score / 100) * circumference;
 
-  let color = "text-red-400";
+  let color = "text-red-400 light:text-red-600";
   if (score >= 70) color = "text-accent";
-  else if (score >= 40) color = "text-yellow-400";
+  else if (score >= 40) color = "text-yellow-400 light:text-yellow-700";
 
   return (
     <div className="relative flex items-center justify-center">
@@ -122,7 +122,7 @@ export default function ATSScoreCard({ analysis }: ATSScoreCardProps) {
             {analysis.topStrengths.map((s, i) => (
               <span
                 key={`${s}-${i}`}
-                className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-400"
+                className="rounded-full bg-emerald-500/15 px-3 py-1 text-xs text-emerald-400 light:text-emerald-700"
               >
                 {s}
               </span>
@@ -141,7 +141,7 @@ export default function ATSScoreCard({ analysis }: ATSScoreCardProps) {
             {analysis.criticalImprovements.map((item, i) => (
               <span
                 key={`${item}-${i}`}
-                className="rounded-full bg-orange-500/15 px-3 py-1 text-xs text-orange-400"
+                className="rounded-full bg-orange-500/15 px-3 py-1 text-xs text-orange-400 light:text-orange-700"
               >
                 {item}
               </span>

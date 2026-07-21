@@ -45,7 +45,7 @@ interface ResumePanelProps {
 
 function CompletenessBar({ percent }: { percent: number }) {
   const tone =
-    percent >= 80 ? 'bg-accent' : percent >= 50 ? 'bg-yellow-400' : 'bg-orange-400';
+    percent >= 80 ? 'bg-accent' : percent >= 50 ? 'bg-yellow-400 light:bg-yellow-600' : 'bg-orange-400 light:bg-orange-600';
 
   return (
     <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ function EntryCard({
     <div className="group relative rounded-lg border border-transparent p-2 transition-colors hover:border-surface-border hover:bg-surface/30">
       <button
         onClick={onRemove}
-        className="absolute right-1.5 top-1.5 rounded p-1 text-text-secondary/40 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 focus:opacity-100 group-hover:opacity-100"
+        className="absolute right-1.5 top-1.5 rounded p-1 text-text-secondary/40 opacity-0 transition-all hover:bg-red-500/10 hover:text-red-400 light:hover:text-red-600 focus:opacity-100 group-hover:opacity-100"
         aria-label={removeLabel}
       >
         <Trash2 className="h-3 w-3" />
@@ -151,7 +151,7 @@ function BulletEditor({
           />
           <button
             onClick={() => onChange(bullets.filter((_, j) => j !== i))}
-            className="mt-1 rounded p-0.5 text-text-secondary/30 transition-colors hover:text-red-400"
+            className="mt-1 rounded p-0.5 text-text-secondary/30 transition-colors hover:text-red-400 light:hover:text-red-600"
             aria-label={t('resume.removeBullet')}
           >
             <Trash2 className="h-2.5 w-2.5" />
@@ -533,7 +533,7 @@ export default function ResumePanel({
               {completeness.missing.map((key) => (
                 <span
                   key={key}
-                  className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-400"
+                  className="rounded-full bg-orange-500/10 px-2 py-0.5 text-[10px] text-orange-400 light:text-orange-700"
                 >
                   {t(key)}
                 </span>
@@ -571,7 +571,7 @@ export default function ResumePanel({
           onClick={() => {
             if (window.confirm(t('resume.clearConfirm'))) reset();
           }}
-          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-[11px] text-text-secondary/60 transition-colors hover:border-red-500/30 hover:text-red-400"
+          className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-transparent px-2 py-1.5 text-[11px] text-text-secondary/60 transition-colors hover:border-red-500/30 hover:text-red-400 light:hover:text-red-600"
         >
           <Trash className="h-3 w-3" />
           {t('resume.clear')}

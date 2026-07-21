@@ -46,7 +46,10 @@ curl -sS -D - -o /dev/null https://myofferagent.com/ | grep -i strict-transport
 랜딩 한 화면 리디자인, 전 에이전트 날짜 그라운딩(dateRule) + Job Scout 신선도
 규칙 + postedDate 파이프라인, PDF 추출 줄바꿈 보존, Triage→Match/Writer·
 Analyzer→Match 핸드오프 확장, Scout에 get_resume.
-검증 기준선(회귀 감지용): 유닛 **323** · browser **16** · a11y **21** ·
+이후 전 저장소 심층 검토(4-영역 병렬 리뷰)로 30건 검증·수리: get_resume full 뷰,
+임포트 프로젝트 날짜 유실, Expected 월 단위 판정, US 대명사 오탐, 라이트 모드
+칩 대비(light: 변형), 마크다운 다중 행 이스케이프, CLEAR 혼합 배열 등.
+검증 기준선(회귀 감지용): 유닛 **334** · browser **16** · a11y **21** ·
 checkmarks **7** · e2e **33**. 프로덕션에 HSTS·COOP 헤더, workers.dev 비활성화 반영됨.
 의도적으로 남긴 것(다음에 볼 만한 것)은 `TECHNICAL.md` §14와 memory 참고: 정적 자산
 보안 헤더(`public/_headers` 필요), 오류 경로의 구조화 데이터 유실(신규 SSE 이벤트 필요),
@@ -84,7 +87,7 @@ git push origin main
 ### 푸시 전 필수 게이트 (순서대로)
 
 ```bash
-npm run check          # typecheck + vitest 323 + next build (webpack). workerd는 검증 못 함
+npm run check          # typecheck + vitest 334 + next build (webpack). workerd는 검증 못 함
 npm run cf:preview     # 실제 workerd, http://localhost:8787 (다른 터미널에서 유지)
 npm run verify:local   # 하네스 4종: browser 16 / a11y 21 / checkmarks 7 / e2e 33
 # 의존성을 바꿨다면:

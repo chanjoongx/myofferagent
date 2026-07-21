@@ -57,7 +57,7 @@ but never translate resume content into Korean.`;
  * 시스템 프롬프트가 아니라 **도구 출력**으로 들어오고, 도구 출력은 모델이
  * 데이터로 취급하도록 훈련된 위치입니다.
  */
-function resumeState(ctx: AppContext): string {
+function resumeState(ctx: AppContext, canReadValues: boolean): string {
   const doc = ctx.resume;
   const c = completeness(doc);
 
@@ -67,6 +67,12 @@ The resume is currently EMPTY. Nothing has been collected yet.`;
   }
 
   const has = (v: string) => (v.length > 0 ? 'set' : 'MISSING');
+
+  // Triage처럼 get_resume이 없는 에이전트에게 "get_resume을 호출하라"고 쓰면
+  // 지시문이 매 턴 자기모순이 됩니다 — 도구 보유 여부로 마지막 줄을 가릅니다.
+  const valuesLine = canReadValues
+    ? 'Call get_resume (view: full) when you need the actual content.'
+    : 'You cannot read the resume content yourself — route based on this state.';
 
   return `## Resume state (server-held source of truth)
 - Completeness: ${c.percent}%
@@ -80,7 +86,7 @@ The resume is currently EMPTY. Nothing has been collected yet.`;
 - Still missing: ${c.missing.length > 0 ? describeMissing(c.missing).join(', ') : 'nothing'}
 
 Do NOT ask again for anything marked "set".
-Call get_resume when you need the actual values.`;
+${valuesLine}`;
 }
 
 /** 사용자 제공 데이터를 지시문보다 낮은 신뢰도로 다루도록 못박습니다. */
@@ -106,14 +112,17 @@ current date.`;
 type Instr = (rc: RunContext<AppContext>) => string;
 
 /** 지시문 함수를 만드는 헬퍼 — 공통 블록을 자동으로 덧붙입니다. */
-function instructions(body: (ctx: AppContext) => string, opts: { withResume?: boolean } = {}): Instr {
+function instructions(
+  body: (ctx: AppContext) => string,
+  opts: { withResume?: boolean; canReadResume?: boolean } = {},
+): Instr {
   return (rc) => {
     const ctx = ctxOf(rc);
     return [
       body(ctx),
       languageRule(ctx),
       dateRule(),
-      opts.withResume ? resumeState(ctx) : '',
+      opts.withResume ? resumeState(ctx, opts.canReadResume ?? true) : '',
       INJECTION_GUARD,
     ]
       .filter(Boolean)
@@ -138,7 +147,9 @@ You need BOTH a resume AND a specific job posting (company, role, requirements).
 If either is missing, ask for it — do not start writing. Never invent a job posting.
 
 ## Your job
-Write a tailored cover letter (English, 250-400 words) for the selected posting.
+First call **get_resume** (view: full) — the summary view has no bullet text, and every
+claim in the letter must come from the actual resume content.
+Then write a tailored cover letter (English, 250-400 words) for the selected posting.
 
 ## Cover letter structure
 - Opening: the role and company by name, and a specific reason for interest.
@@ -153,8 +164,9 @@ Write a tailored cover letter (English, 250-400 words) for the selected posting.
 
 ## Resume optimization
 If the user wants the resume tailored to this posting, describe the specific edits
-(which bullet, what to change, why). The user applies them in the resume editor —
-you do not regenerate the whole document.`,
+(which bullet, what to change, why). The user can apply them in the resume editor;
+if they want the edits actually applied for them, hand off to Resume Builder instead
+of walking them through manual steps. You never regenerate the whole document yourself.`,
     { withResume: true },
   ),
 });
@@ -187,6 +199,8 @@ Accept any form of agreement ("네", "응 찾아줘", "yes please", "sure") — 
 require a specific phrase. Never fabricate a posting. Never show an empty analysis.
 
 ## Analysis — call report_match with all of it
+Before analyzing, call **get_resume** (view: full) — you need the actual bullets and
+skills to compare against the posting, not just what sections exist.
 1. matchScore (0-100): overall fit.
 2. keywordGap: which posting keywords appear in the resume, which are absent.
 3. skillMatch: required and preferred skills, met vs unmet, with percentages.
@@ -222,9 +236,9 @@ export const jobScoutAgent = new Agent<AppContext>({
     () => `You are the "Job Scout" agent — you find real, currently-open job postings via live web search.
 
 ## Required sequence
-1. If the Resume state below shows a resume exists, call **get_resume** once first and
-   build your queries from the stored target role, skills, and location. Do not ask the
-   user for anything the resume already answers.
+1. If the Resume state below shows a resume exists, call **get_resume** (view: full)
+   once first and build your queries from the stored target role, skills, and location.
+   Do not ask the user for anything the resume already answers.
 2. **Call web_search.** **Hard limit: 3 searches.** Each one costs the user roughly
    10 seconds of waiting, and they see only a spinner until you finish. Stop early the
    moment you have ~5 solid postings — breadth past that is not worth the wait.
@@ -240,7 +254,7 @@ export const jobScoutAgent = new Agent<AppContext>({
 4. Summarize the list and ask which posting interests them.
 
 ## Freshness — a closed posting wastes everyone's time
-- Anchor every date judgment to the Today section above.
+- Anchor every date judgment to the Today section of this prompt.
 - Prefer postings published within the last 30 days. US new-grad roles often close
   within weeks of opening.
 - New-grad and intern hiring is seasonal. Use today's date to pick the cycle year and
@@ -348,7 +362,8 @@ export const resumeBuilderAgent = new Agent<AppContext>({
 ## How state works (important)
 The resume lives on the server, not in your memory. Every tool call you make patches it
 and returns the updated state. You never need to restate the whole document.
-Call **get_resume** any time you are unsure what is already saved.
+Call **get_resume** any time you are unsure what is already saved
+(view: full when you need the exact saved text, e.g. before improving bullets).
 
 ## Saving is not optional — save FIRST, improve SECOND
 The moment the user tells you something, persist it with the matching tool
@@ -474,7 +489,8 @@ Introduce the service in one or two sentences and ask whether they already have 
 Do not analyze, write, or search yourself. You have no tools — routing is your only job.`,
     // 핸드오프 설명이 "이력서가 있는 사용자 / 없는 사용자"를 구분하므로
     // Triage도 이력서 상태를 알아야 합니다. (없으면 눈 감고 라우팅하는 셈)
-    { withResume: true },
+    // 단, Triage에는 get_resume이 없으므로 상태 블록의 도구 안내는 끕니다.
+    { withResume: true, canReadResume: false },
   ),
 });
 

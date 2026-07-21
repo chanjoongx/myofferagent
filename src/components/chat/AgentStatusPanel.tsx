@@ -161,7 +161,7 @@ export default memo(function AgentStatusPanel({
                       isCurrent
                         ? "bg-accent/10 border border-accent/30"
                         : isDone
-                          ? "opacity-60"
+                          ? "opacity-70"
                           : "opacity-60"
                     } ${canClick ? "hover:bg-accent/5 cursor-pointer" : "cursor-default"}`}
                   >

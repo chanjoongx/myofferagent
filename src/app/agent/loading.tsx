@@ -11,8 +11,9 @@ export default function AgentLoading() {
   return (
     <div className="app-shell w-full">
       <div className="flex flex-1 min-h-0 flex-col md:flex-row">
-      {/* Sidebar skeleton */}
-      <div className="hidden md:flex w-60 lg:w-64 shrink-0 flex-col border-r border-surface-border glass p-5 gap-4">
+      {/* Sidebar skeleton — 실제 사이드바(md:w-56 lg:w-60)와 같은 폭이어야
+          하이드레이션 시 레이아웃이 튀지 않습니다 */}
+      <div className="hidden md:flex md:w-56 lg:w-60 shrink-0 flex-col border-r border-surface-border glass p-5 gap-4">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="h-7 w-7 rounded-lg bg-surface-border animate-pulse" />
@@ -55,6 +56,18 @@ export default function AgentLoading() {
             <div className="flex-1 h-10 rounded-xl bg-surface-border/50 animate-pulse" />
             <div className="h-9 w-9 rounded-lg bg-surface-border animate-pulse" />
           </div>
+        </div>
+      </div>
+
+      {/* Resume panel skeleton — 실제 우측 컬럼(md:w-80 lg:w-96)과 동일 폭.
+          없으면 하이드레이션 순간 채팅 영역이 이 폭만큼 좁아지며 튑니다. */}
+      <div className="hidden md:flex md:w-80 lg:w-96 shrink-0 flex-col border-l border-surface-border p-5 gap-4">
+        <div className="h-4 w-24 rounded bg-surface-border animate-pulse" />
+        <div className="h-2 w-full rounded-full bg-surface-border/60 animate-pulse" />
+        <div className="mt-2 space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-9 w-full rounded-lg bg-surface-border/50 animate-pulse" />
+          ))}
         </div>
       </div>
       </div>

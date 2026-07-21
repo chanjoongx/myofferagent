@@ -21,6 +21,7 @@ import {
   LIST_SECTIONS,
   type ResumeDocument,
 } from '@/lib/resume/schema';
+import { toPlainText } from '@/lib/resume/render/markdown';
 import { ctxOf, type AppContext } from '../context';
 import { inlineValue } from '../sanitize';
 import { hasFabricatedNumber } from '../fabrication';
@@ -57,12 +58,18 @@ function definedOnly<T extends Record<string, unknown>>(obj: T): Partial<T> {
     }
     if (v === '' || v === undefined || v === null) continue;
     if (Array.isArray(v)) {
-      // 배열도 센티널 하나만 담아 보내면 비우기로 해석합니다.
-      if (v.length === 1 && v[0] === CLEAR) {
-        out[k] = [];
+      // 배열 안의 센티널은 콘텐츠가 아니므로 항상 걷어냅니다. 예전에는 단독
+      // [CLEAR]만 처리해서, 실수로 섞어 보낸 ['__CLEAR__', '실제 불릿']이
+      // 센티널 문자열을 이력서 본문으로 저장했습니다.
+      const hadClear = v.includes(CLEAR);
+      const cleaned = hadClear ? v.filter((x) => x !== CLEAR) : v;
+      if (cleaned.length === 0) {
+        // 센티널만 보냈으면 "비우기", 애초에 빈 배열이면 "변경 없음".
+        if (hadClear) out[k] = [];
         continue;
       }
-      if (v.length === 0) continue;
+      out[k] = cleaned;
+      continue;
     }
     out[k] = v;
   }
@@ -119,14 +126,38 @@ type Ctx = RunContext<AppContext> | undefined;
    1. 현재 상태 조회
    ──────────────────────────────────────────── */
 
+/* full 뷰 출력 상한. 스키마 상한을 전부 꽉 채운 적대적 resumeDoc은 직렬화가
+ * 수십만 자까지 커질 수 있는데, 그 전체가 에이전트 컨텍스트로 들어가면 도구
+ * 출력이 토큰 폭탄이 됩니다 (analyze_ats의 60k 상한과 같은 계열의 방어). */
+const MAX_FULL_VIEW_CHARS = 30_000;
+
 export const getResume = tool({
   name: 'get_resume',
   description:
-    '저장된 이력서의 **실제 값**이 필요할 때만 호출하세요 (예: 기존 불릿을 수정하려고 원문을 확인할 때). ' +
+    '저장된 이력서를 조회합니다. view=summary(기본)는 진행 상태 요약만, view=full은 불릿·스킬·날짜 등 실제 내용 전부를 반환합니다. ' +
+    '커버레터 작성, 매칭 분석, 불릿 수정처럼 실제 문장이 필요하면 반드시 view=full로 호출하세요. ' +
     '무엇이 채워졌는지 여부는 지시문의 Resume state에 이미 있으니 그것만 보려고 호출하지 마세요 — 불필요한 왕복입니다.',
-  parameters: z.object({}),
-  execute: async (_input, runContext: Ctx): Promise<string> => {
+  parameters: z.object({
+    view: z
+      .enum(['summary', 'full'])
+      .default('summary')
+      .describe('summary=진행 상태 요약, full=이력서 실제 내용 전체'),
+  }),
+  execute: async (input, runContext: Ctx): Promise<string> => {
     const ctx = ctxOf(runContext);
+    if (input.view === 'full') {
+      const full = JSON.stringify({
+        ok: true,
+        note: '이력서 전체 내용입니다. 항목을 수정할 때는 해당 id로 upsert 도구를 호출하세요.',
+        resume: ctx.resume,
+      });
+      if (full.length <= MAX_FULL_VIEW_CHARS) return full;
+      return JSON.stringify({
+        ok: true,
+        note: '문서가 비정상적으로 커서 평문 미리보기로 대체합니다.',
+        preview: toPlainText(ctx.resume).slice(0, MAX_FULL_VIEW_CHARS),
+      });
+    }
     return snapshot(ctx.resume, '현재 이력서 상태입니다.');
   },
 });
@@ -203,6 +234,14 @@ export const upsertEducation = tool({
   execute: async (input, runContext: Ctx): Promise<string> => {
     const ctx = ctxOf(runContext);
     const next = upsertListItem(ctx.resume, 'education', definedOnly(input));
+    // 상한(20개)에 걸려 추가가 조용히 무시됐는데 ok:true를 돌려주면
+    // 모델이 "저장했다"고 답합니다 — 실패를 실패라고 말합니다.
+    if (!input.id && next.education.length === ctx.resume.education.length) {
+      return snapshot(
+        ctx.resume,
+        '저장하지 못했습니다: 학력 섹션이 가득 찼습니다(최대 20개). 기존 항목을 삭제하거나 합친 뒤 다시 시도하세요.',
+      );
+    }
     commit(ctx, next);
     return snapshot(next, '학력을 저장했습니다.');
   },
@@ -236,6 +275,12 @@ export const upsertExperience = tool({
     const ctx = ctxOf(runContext);
     // definedOnly가 null(=변경 없음)은 버리고 true/false는 그대로 통과시킵니다.
     const next = upsertListItem(ctx.resume, 'experience', definedOnly(input));
+    if (!input.id && next.experience.length === ctx.resume.experience.length) {
+      return snapshot(
+        ctx.resume,
+        '저장하지 못했습니다: 경력 섹션이 가득 찼습니다(최대 20개). 기존 항목을 삭제하거나 합친 뒤 다시 시도하세요.',
+      );
+    }
     commit(ctx, next);
     return snapshot(next, '경력을 저장했습니다.');
   },
@@ -260,6 +305,12 @@ export const upsertProject = tool({
   execute: async (input, runContext: Ctx): Promise<string> => {
     const ctx = ctxOf(runContext);
     const next = upsertListItem(ctx.resume, 'projects', definedOnly(input));
+    if (!input.id && next.projects.length === ctx.resume.projects.length) {
+      return snapshot(
+        ctx.resume,
+        '저장하지 못했습니다: 프로젝트 섹션이 가득 찼습니다(최대 20개). 기존 항목을 삭제하거나 합친 뒤 다시 시도하세요.',
+      );
+    }
     commit(ctx, next);
     return snapshot(next, '프로젝트를 저장했습니다.');
   },

@@ -105,7 +105,7 @@ leaving the chat.
 | **Triage** | Reads intent and routes to the right specialist. Has no tools of its own |
 | **Resume Builder** | Builds a resume conversationally; every answer is saved to the canonical document through patch tools |
 | **Resume Analyzer** | Imports raw resume text and produces the 100-point ATS score |
-| **Job Scout** | Live web search for postings; reports structured job cards with sponsorship status |
+| **Job Scout** | Live web search for postings, grounded in today's date; reports structured job cards with sponsorship status and the posting date as seen at the source |
 | **Match Strategy** | Scores resume-to-posting fit: keyword gap, met and unmet skills, concrete edit suggestions |
 | **Application Writer** | Writes a 250-400 word cover letter grounded only in what the resume actually says |
 
@@ -154,7 +154,7 @@ leaving the chat.
 
 ## Verification
 
-`npm run check` runs typecheck, 321 unit tests, and the production build. Because none of
+`npm run check` runs typecheck, 334 unit tests, and the production build. Because none of
 that exercises the real Workers runtime, `scripts/verify/` adds four harnesses that run
 against a real browser and a real workerd:
 

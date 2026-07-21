@@ -22,7 +22,7 @@ export default function AgentError({
     <div className="flex app-shell items-center justify-center p-6">
       <div className="flex flex-col items-center gap-4 text-center max-w-md">
         <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-red-500/10 border border-red-500/20">
-          <AlertTriangle className="h-7 w-7 text-red-400" />
+          <AlertTriangle className="h-7 w-7 text-red-400 light:text-red-600" />
         </div>
         <h2 className="text-lg font-semibold text-text-primary">
           {t("agentError.title")}

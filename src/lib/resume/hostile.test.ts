@@ -377,16 +377,31 @@ describe('list() — garbage elements', () => {
    ──────────────────────────────────────────── */
 
 describe('upsertListItem — undefined values', () => {
-  it('explicit undefined in patch WIPES the existing field', () => {
+  it('explicit undefined in patch is DROPPED — the existing field survives', () => {
     const doc = upsertListItem(emptyResume(), 'experience', {
       company: 'Acme',
       bullets: ['kept me employed'],
     });
     const id = doc.experience[0].id;
     const after = upsertListItem(doc, 'experience', { id, bullets: undefined });
-     
-    console.log('[upsert undefined] bullets =', JSON.stringify(after.experience[0].bullets));
+
     expect(after.experience[0].company).toBe('Acme');
+    // defined()가 undefined 값을 걷어내므로 기존 불릿이 보존되어야 한다.
+    expect(after.experience[0].bullets).toEqual(['kept me employed']);
+  });
+});
+
+/* ────────────────────────────────────────────
+   5b. 길이 절삭 경계의 서로게이트 쌍
+   ──────────────────────────────────────────── */
+
+describe('length clamp vs surrogate pairs', () => {
+  it('상한 경계에서 이모지가 반토막 나도 홀로 남은 서로게이트가 생기지 않는다', () => {
+    // name 상한 200: 'a'×199 + 이모지(2 code unit) → slice(0,200)가 쌍을 가른다.
+    // 절삭 후 재정리가 없으면 홀로 남은 상위 서로게이트가 DOCX/인쇄에 U+FFFD로 샌다.
+    const doc = coerceResume({ basics: { name: 'a'.repeat(199) + '😀' } });
+    expect(doc.basics.name.length).toBe(199);
+    expect(/[\uD800-\uDFFF]/.test(doc.basics.name)).toBe(false);
   });
 });
 

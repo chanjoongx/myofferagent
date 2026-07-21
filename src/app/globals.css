@@ -1,5 +1,11 @@
 @import "tailwindcss";
 
+/* 라이트 테마 전용 유틸리티 변형. 이 앱은 prefers-color-scheme이 아니라
+ * html.light/html.dark 클래스로 테마를 전환하므로 기본 dark: 변형을 쓸 수 없다.
+ * 색상 칩의 -400 계열은 다크에서만 대비가 충분해서, 라이트에서는
+ * light:text-*-600/700으로 어둡게 내린다 (WCAG 4.5:1). */
+@custom-variant light (&:where(html.light, html.light *));
+
 @theme {
   --color-accent: oklch(0.765 0.177 163.22);
   --color-accent-hover: oklch(0.700 0.177 163.22);

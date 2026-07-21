@@ -179,7 +179,17 @@ export function formatEducationDate(start: string, end: string, now = new Date()
 
   const normalized = normalizeDate(end);
   // 졸업일이 미래면 "Expected"를 붙입니다.
-  if (endYear !== null && endYear > now.getFullYear()) return `Expected ${normalized}`;
+  // 연도만 비교하면 **같은 해의 미래 졸업**(봄에 12월 졸업예정자가 지원하는,
+  // 이 앱의 핵심 사용 시점)이 Expected를 잃습니다 — 월까지 비교합니다.
+  if (endYear !== null) {
+    if (endYear > now.getFullYear()) return `Expected ${normalized}`;
+    if (endYear === now.getFullYear()) {
+      const m = normalized.match(/^([A-Za-z]{3}) \d{4}$/);
+      const month = m ? MONTH_LOOKUP[m[1].toLowerCase()] : null;
+      // 월을 모르면(연도만 적힌 날짜) 미래라고 단정할 수 없어 붙이지 않습니다.
+      if (month && month > now.getMonth() + 1) return `Expected ${normalized}`;
+    }
+  }
   return normalized;
 }
 
